@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "mcp-ambari-api"
 version = "0.0.0"
@@ -12,5 +16,6 @@ dependencies = [
 [project.scripts]
 mcp-ambari-api = "mcp_ambari_api.ambari_api:main"
 
-[tool.setuptools.packages]
-find = { where = ["src"] }
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["mcp_ambari_api*"]
