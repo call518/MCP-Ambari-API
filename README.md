@@ -98,17 +98,15 @@ Below is an example screenshot showing how to query the Ambari cluster using MCP
 - [x] Cluster configuration (get & update) (`configuration.md`, `config-groups.md`)
 - [x] Request & task tracking (`requests.md`, `request-resources.md`, `tasks.md`, `task-resources.md`)
 - [x] Service component/host information (`components.md`, `components-component.md`, `component-resources.md`, `hosts.md`, `hosts-host.md`, `host-resources.md`, `host-components.md`, `host-component.md`)
+- [ ] Host/HostComponent detailed management (`host-components.md`, `host-component.md`, `hosts-host.md`)
+- [ ] User management (`user-*.md`)
+- [ ] Permission management (`permission-*.md`)
+- [ ] View management (`view-resources.md`)
 - [ ] Alert definitions & dispatching (`alert-definitions.md`, `alert-dispatching.md`, `alerts.md`)
 - [ ] Authentication source management (`authentication-source-*.md`)
 - [ ] Config group management (`config-groups.md`)
 - [ ] Credential management (`credential-*.md`)
-- [ ] Host/HostComponent detailed management (`host-components.md`, `host-component.md`, `hosts-host.md`)
-- [ ] Job/Workflow management (`job-resources.md`, `workflow-resources.md`)
-- [ ] Permission management (`permission-*.md`)
 - [ ] Repository/Stack version management (`repository-version-resources.md`, `stack-version-resources.md`)
-- [ ] Request schedules/rolling upgrade (`request-schedules.md`, `rolling-upgrade-check-resources.md`, `upgrades.md`)
-- [ ] User management (`user-*.md`)
-- [ ] View management (`view-resources.md`)
 
 > Only the most practical and useful features are selected. Contributions and suggestions are welcome!
 
