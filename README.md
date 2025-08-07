@@ -74,7 +74,7 @@ This section describes how to set up the MCP Tools environment to control an Amb
 ### Tested Env.
 
 - WSL2 Linux on Windows11
-- Ambari-3.0 Cluster - [Deploy Ambari-3.0 Cluster](https://call518.medium.com/install-ambari-3-0-with-docker-297a8bb108c8)
+- Ambari-3.0 Cluster - [Create Ambari-3.0 Demo Cluster](https://call518.medium.com/install-ambari-3-0-with-docker-297a8bb108c8)
 
 ### 1. Prepare Ambari Cluster (Test Target)
 
