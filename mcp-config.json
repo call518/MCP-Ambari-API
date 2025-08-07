@@ -1,13 +1,5 @@
 {
   "mcpServers": {
-    "fetch": {
-      "command": "uvx",
-      "args": ["mcp-server-fetch", "--ignore-robots-txt"]
-    },
-    "time": {
-      "command": "uvx",
-      "args": ["mcp-server-time", "--local-timezone=Asia/Seoul"]
-    },
     "ambar-api": {
       "command": "uvx",
       "args": ["--python", "3.11", "mcp-ambari-api"],

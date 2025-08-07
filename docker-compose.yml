@@ -13,9 +13,9 @@ services:
     restart: always
 
   # Optional: MCP Proxy Server for tools
-  mcpo-server:
-    image: call518/mcpo-server:latest
-    container_name: mcpo-server
+  mcpo-proxy:
+    image: call518/mcpo-proxy:latest
+    container_name: mcpo-proxy
     ports:
       - "8000:8000"
     volumes:

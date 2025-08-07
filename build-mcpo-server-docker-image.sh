@@ -1,10 +1,10 @@
 #!/bin/bash
 set -o
 
-IMAGE_NAME="call518/mcpo-server"
+IMAGE_NAME="call518/mcpo-proxy"
 
 # CUSTOM_TAG="${1:-latest}"
-CUSTOM_TAG="1.0.3"
+CUSTOM_TAG="1.0.0"
 
 for TAG in ${CUSTOM_TAG} latest
 do
