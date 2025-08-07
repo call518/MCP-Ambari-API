@@ -84,9 +84,6 @@ Below is an example screenshot showing how to query the Ambari cluster using MCP
 #### Example Query #1 - Cluster Info/Status
 ![Example: Querying Ambari Cluster(1)](img/ex-qna-1.png)
 
-#### Example Query #2 - Cluster Configuration Review & Recommendations
-![Example: Querying Ambari Cluster(2)](img/ex-qna-2.png)
-
 ## Roadmap
 
 **✅: Implemented**  
