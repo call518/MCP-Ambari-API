@@ -15,7 +15,7 @@ Model Context Protocol (MCP) server for Apache Ambari API integration. This proj
 
 The main MCP tool file is located at `src/mcp_ambari_api/ambari_api.py`.
 
-## How To Use
+## How To Use?
 
 Using this Ambari API integration is very simple and straightforward. If you already have an MCP Tools environment running, just add the following configuration to your `mcp-config.json` file:
 
