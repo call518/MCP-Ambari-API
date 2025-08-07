@@ -82,7 +82,10 @@ Here, enter the Ambari-API address (e.g., `http://localhost:8000/ambari-api`) to
 Below is an example screenshot showing how to query the Ambari cluster using MCP Tools in OpenWebUI:
 
 #### Example Query #1 - Cluster Info/Status
-![Example: Querying Ambari Cluster(1)](img/ex-qna-1.png)
+![Example: Querying Ambari Cluster(1)](img/ex-screenshot-1.png)
+
+#### Example Query #2 - Cluster Configuration Review & Recommendations
+![Example: Querying Ambari Cluster(2)](img/ex-screenshot-2.png)
 
 ## Roadmap
 
