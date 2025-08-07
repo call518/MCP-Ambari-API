@@ -8,3 +8,6 @@ dependencies = [
     "aiohttp>=3.12.15",
     "fastmcp>=2.11.1",
 ]
+
+[project.scripts]
+mcp-ambari-api = "mcp-ambari-api.ambari_api:main"

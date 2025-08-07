@@ -1236,12 +1236,11 @@ async def restart_all_services() -> str:
 # Server Execution
 # =============================================================================
 
-if __name__ == "__main__":
+def main():
     """
-    Starts the server.
-    
-    Usage:
-    1. For development, use stdio transport: mcp.run(transport='stdio')
-    2. For production, use other transport methods as needed
+    Entrypoint for MCP Ambari API server.
     """
     mcp.run(transport='stdio')
+
+if __name__ == "__main__":
+    main()
