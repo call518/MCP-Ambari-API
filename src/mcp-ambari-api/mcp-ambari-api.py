@@ -1,12 +1,3 @@
-#!/usr/bin/env python3
-# /// script
-# requires-python = ">=3.11"
-# dependencies = [
-#   "fastmcp>=0.1.0",
-#   "aiohttp>=3.8.0",
-# ]
-# ///
-
 from typing import Dict, Optional
 from mcp.server.fastmcp import FastMCP
 import os
