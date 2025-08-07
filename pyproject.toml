@@ -10,4 +10,7 @@ dependencies = [
 ]
 
 [project.scripts]
-mcp-ambari-api = "mcp-ambari-api.ambari_api:main"
+mcp-ambari-api = "mcp_ambari_api.ambari_api:main"
+
+[tool.setuptools.packages]
+find = { where = ["src"] }
