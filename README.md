@@ -87,6 +87,10 @@ Below is an example screenshot showing how to query the Ambari cluster using MCP
 #### Example Query #2 - Cluster Configuration Review & Recommendations
 ![Example: Querying Ambari Cluster(2)](img/ex-screenshot-2.png)
 
+#### Example Query #3 - Restart HDFS Service
+![Example: Querying Ambari Cluster(3)](img/ex-screenshot-3-1.png)
+![Example: Querying Ambari Cluster(3)](img/ex-screenshot-3-2.png)
+
 ## Roadmap
 
 **✅: Implemented**  
