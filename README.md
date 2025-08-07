@@ -11,9 +11,39 @@ Model Context Protocol (MCP) server for Apache Ambari API integration. This proj
 - Retrieve and update configurations
 - Track request progress
 
-## Main Tool File
+## Available MCP Tools
 
-The main MCP tool file is located at `src/mcp_ambari_api/ambari_api.py`.
+This MCP server provides the following tools for Ambari cluster management:
+
+### Cluster Management
+- `get_cluster_info` - Retrieve basic cluster information and status
+- `get_active_requests` - List currently active/running operations
+- `get_request_status` - Check status and progress of specific requests
+
+### Service Management
+- `get_cluster_services` - List all services with their status
+- `get_service_status` - Get detailed status of a specific service
+- `get_service_components` - List components and host assignments for a service
+- `get_service_details` - Get comprehensive service information
+- `start_service` - Start a specific service
+- `stop_service` - Stop a specific service
+- `restart_service` - Restart a specific service
+- `start_all_services` - Start all services in the cluster
+- `stop_all_services` - Stop all services in the cluster
+- `restart_all_services` - Restart all services in the cluster
+
+### Configuration Management
+- `get_configurations` - Retrieve service configuration types and values
+- `list_configurations` - List all available configuration types in the cluster
+
+### Host Management
+- `list_hosts` - List all hosts in the cluster
+- `get_host_details` - Get detailed information for specific or all hosts
+
+## Main Tool Files
+
+- **Main MCP tool file**: `src/mcp_ambari_api/ambari_api.py`
+- **Utility functions**: `src/mcp_ambari_api/functions.py`
 
 ## How To Use
 
@@ -102,7 +132,7 @@ Below is an example screenshot showing how to query the Ambari cluster using MCP
 - [x] Cluster configuration (get & update) (`configuration.md`, `config-groups.md`)
 - [x] Request & task tracking (`requests.md`, `request-resources.md`, `tasks.md`, `task-resources.md`)
 - [x] Service component/host information (`components.md`, `components-component.md`, `component-resources.md`, `hosts.md`, `hosts-host.md`, `host-resources.md`, `host-components.md`, `host-component.md`)
-- [ ] Host/HostComponent detailed management (`host-components.md`, `host-component.md`, `hosts-host.md`)
+- [x] Host/HostComponent detailed management (`host-components.md`, `host-component.md`, `hosts-host.md`)
 - [ ] User management (`user-*.md`)
 - [ ] Permission management (`permission-*.md`)
 - [ ] View management (`view-resources.md`)
