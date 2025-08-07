@@ -71,6 +71,11 @@ Using this Ambari API integration is very simple and straightforward. If you alr
 
 This section describes how to set up the MCP Tools environment to control an Ambari cluster using OpenWebUI and MCPO, leveraging the provided `docker-compose.yml` and `Dockerfile`.
 
+### Tested Env.
+
+- WSL2 Linux on Windows11
+- [Ambari-3.0 Cluster on Docker Container](https://call518.medium.com/install-ambari-3-0-with-docker-297a8bb108c8)
+
 ### 1. Prepare Ambari Cluster (Test Target)
 
 To set up a Ambari Demo cluster, follow the guide at:
