@@ -197,6 +197,12 @@ Below is an example screenshot showing how to query the Ambari cluster using MCP
 
 > Only the most practical and useful features are selected. Contributions and suggestions are welcome!
 
+## Appendix: Smithery Deployment
+
+Public Smithery deployment available for quick trials (no local setup) if you have a publicly reachable Ambari cluster. Open the server page and supply your Ambari connection values in the configuration form, then invoke tools immediately. Do NOT enter sensitive credentials unless you trust the environment. Link: https://smithery.ai/server/@call518/mcp-ambari-api
+
+![Smithery Deployment Screenshot](img/ex-screenshot-smithery.ai.png)
+
 ## License
 
 This project is licensed under the MIT License.
