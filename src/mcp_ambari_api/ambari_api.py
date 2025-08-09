@@ -1318,10 +1318,20 @@ async def get_prompt_template(section: Optional[str] = None, mode: Optional[str]
         return f"Error: Unable to read packaged prompt_template.md - {e}" 
 
     if mode == 'headings':
-        headings = [line[3:].strip() for line in content.splitlines() if line.startswith('## ')]
+        import re
+        raw_headings = [line[3:].strip() for line in content.splitlines() if line.startswith('## ')]
+        # Each raw heading already starts with its own numeric prefix (e.g. "1. Purpose"),
+        # so we avoid double-numbering like "1. 1. Purpose" by stripping existing prefix and re-indexing.
+        cleaned = []
+        for h in raw_headings:
+            m = re.match(r'^(\d+)\.\s+(.*)$', h)
+            if m:
+                cleaned.append(m.group(2).strip())
+            else:
+                cleaned.append(h)
         lines = ["Section Headings:"]
-        for idx, h in enumerate(headings, 1):
-            lines.append(f"{idx}. {h}")
+        for idx, title in enumerate(cleaned, 1):
+            lines.append(f"{idx}. {title}")
         return "\n".join(lines)
 
     if not section:
@@ -1362,43 +1372,45 @@ async def get_prompt_template(section: Optional[str] = None, mode: Optional[str]
 
 @mcp.prompt("prompt_template_full")
 async def prompt_template_full() -> str:
-    """Return the full canonical Ambari prompt template.
-
-    Usage (inspector): prompts/get name=prompt_template_full
-    When to use: Need complete guidance context or to re-anchor the assistant.
-    """
+    """Return the full canonical prompt template."""
     return await get_prompt_template()
 
 @mcp.prompt("prompt_template_headings")
 async def prompt_template_headings() -> str:
-    """List only the numbered section headings in order.
-
-    Usage: prompts/get name=prompt_template_headings
-    When to use: Quickly discover available sections before fetching one.
-    """
+    """Return compact list of section headings."""
     return await get_prompt_template(mode="headings")
 
 @mcp.prompt("prompt_template_section")
 async def prompt_template_section(section: Optional[str] = None) -> str:
-    """Return a specific section by number or keyword.
+    """Return a specific prompt template section by number or keyword.
 
-    Usage examples (inspector):
-      prompts/get name=prompt_template_section arguments={"section":"1"}
-      prompts/get name=prompt_template_section arguments={"section":"tool map"}
-      prompts/get name=prompt_template_section arguments={"section":"decision flow"}
-
-    If 'section' is omitted, returns a short help plus headings list instead of erroring.
+    If 'section' is omitted: returns a concise help block plus a compact headings list instead of erroring.
     """
     if not section:
-        headings = await get_prompt_template(mode="headings")
-        help_text = [
-            "Missing 'section' argument.",
-            "Provide a section number or keyword.",
+        raw = await get_prompt_template(mode="headings")
+        lines = [l.strip() for l in raw.splitlines() if l.strip() and not l.startswith("Section Headings:")]
+        compact_parts = []
+        for l in lines:
+            first = l.split(None, 1)
+            if len(first) == 2 and first[0].endswith('.'):
+                remainder = first[1]
+                if remainder and remainder[0].isdigit() and remainder[1:3] == '. ':
+                    remainder = remainder.split(' ', 1)[1] if ' ' in remainder else remainder
+            else:
+                remainder = l
+            index_token = l.split('.', 1)[0]
+            if not index_token.isdigit():
+                import re
+                m = re.search(r'^(\d+)', l)
+                index_token = m.group(1) if m else '?'
+            compact_parts.append(f"{index_token} {remainder.strip()}")
+        compact = " | ".join(compact_parts)
+        return "\n".join([
+            "[HELP] Missing 'section' argument.",
+            "Specify a section number or keyword.",
             "Examples: 1 | purpose | tool map | decision flow",
-            "---",
-            headings
-        ]
-        return "\n".join(help_text)
+            f"Headings: {compact}"
+        ])
     return await get_prompt_template(section=section)
 
 # =============================================================================
