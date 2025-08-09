@@ -41,6 +41,17 @@ This MCP server provides the following tools for Ambari cluster management:
 - `get_host_details` - Get detailed information for specific or all hosts
 
 ## Prompt Template
+The package exposes a tool `get_prompt_template` that returns either the entire template, a specific section, or just the headings.
+
+### MCP Prompts
+
+For easier discoverability in MCP clients (so `prompts/list` is not empty), the server now registers three prompts:
+
+- `prompt_template_full` – returns the full canonical template
+- `prompt_template_headings` – returns only the section headings
+- `prompt_template_section` – takes a `section` argument (number or keyword) and returns that section
+
+You can still use the `get_prompt_template` tool for programmatic access or when you prefer tool invocation over prompt retrieval.
 
 Single canonical English prompt template guides safe and efficient tool selection.
 

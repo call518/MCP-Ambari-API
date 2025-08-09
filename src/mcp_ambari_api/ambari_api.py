@@ -1357,6 +1357,33 @@ async def get_prompt_template(section: Optional[str] = None, mode: Optional[str]
     return f"Section '{section}' not found. Available sample keys: {sample_keys}"
 
 # =============================================================================
+# MCP Prompts (for prompts/list exposure)
+# =============================================================================
+
+@mcp.prompt("prompt_template_full")
+async def prompt_template_full() -> str:
+    """Full canonical Ambari prompt template.
+
+    Appears in prompts/list as 'prompt_template_full'.
+    Use prompts/get with this name to retrieve entire template without a tool call decision cycle.
+    """
+    return await get_prompt_template()
+
+@mcp.prompt("prompt_template_headings")
+async def prompt_template_headings() -> str:
+    """List section headings of the canonical template."""
+    return await get_prompt_template(mode="headings")
+
+@mcp.prompt("prompt_template_section")
+async def prompt_template_section(section: str) -> str:
+    """Return a specific section of the canonical template.
+
+    Args:
+        section: Number or keyword (e.g. '1', 'purpose', 'tool map').
+    """
+    return await get_prompt_template(section=section)
+
+# =============================================================================
 # Server Execution
 # =============================================================================
 
