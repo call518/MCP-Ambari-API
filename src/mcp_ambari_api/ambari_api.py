@@ -1081,7 +1081,7 @@ async def restart_service(service_name: str) -> str:
                 return f"Error: Stop operation for service '{service_name}' failed with status '{request_status}'."
 
             logger.info("Stopping service '%s'... Progress: %d%%", service_name, progress_percent)
-            await asyncio.sleep(1)  # Wait for 5 seconds before checking again
+            await asyncio.sleep(2)  # Wait for 5 seconds before checking again
 
         # Step 3: Start the service (no progress output, fire and forget)
         start_endpoint = f"/clusters/{cluster_name}/services/{service_name}"
@@ -1162,7 +1162,7 @@ async def restart_all_services() -> str:
                 break
             elif "Status: FAILED" in status_result or "Status: ABORTED" in status_result:
                 return f"Error: Stop operation for all services failed. {status_result}"
-            await asyncio.sleep(1)
+            await asyncio.sleep(2)
 
         # Step 2: Start all services (no progress output, fire and forget)
         start_result = await start_all_services()
