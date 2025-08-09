@@ -1,4 +1,4 @@
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 from mcp.server.fastmcp import FastMCP
 import os
 import importlib.resources as pkg_resources
@@ -27,143 +27,141 @@ mcp = FastMCP("ambari-api")
 
 
 @mcp.tool()
-async def get_configurations(service_name: str, config_type: Optional[str] = None) -> str:
-    """
-    Retrieves configuration information for a specific service in an Ambari cluster.
+async def dump_configurations(
+    config_type: Optional[str] = None,
+    service_filter: Optional[str] = None,
+    filter: Optional[str] = None,
+    summarize: bool = False,
+    include_values: bool = True,
+    limit: int = 0,
+    max_chars: int = 30000,
+) -> str:
+    """Unified configuration introspection tool (supersedes get_configurations & list_configurations & dump_all_configurations).
 
-    [Tool Role]: Dedicated tool for retrieving service configuration types and values from Ambari.
-
-    [Core Functions]:
-    - List available configuration types for a service
-    - Retrieve latest configuration values for a specific type
-    - Provide clear output for LLM automation and troubleshooting
-
-    [Required Usage Scenarios]:
-    - When users request service configuration details or types
-    - When troubleshooting or tuning service settings
-    - When users mention config type, config value, or configuration list
+    Modes:
+      1) Single type values: specify config_type=<type>
+      2) Bulk list (optionally narrowed by service_filter substring in type name)
+      3) Filtering keys/types via filter substring
 
     Args:
-        service_name: Name of the service (e.g., "HDFS", "YARN", "HBASE")
-        config_type: Specific configuration type to fetch (optional)
-
-    Returns:
-        Configuration information or a list of available configuration types (success: formatted list or values, failure: English error message)
+        config_type: focus on one type's latest tag (other bulk params ignored except filter on keys)
+        service_filter: substring to restrict bulk types (ignored if config_type provided)
+        filter: substring applied to type names OR property keys
+        summarize: bulk mode summary lines only (counts + sample keys, forces include_values False)
+        include_values: include key=value pairs (bulk/full mode only)
+        limit: max number of types to output in bulk mode (0 = unlimited)
+        max_chars: truncate final output if exceeds
     """
     cluster_name = AMBARI_CLUSTER_NAME
+    f_lc = filter.lower() if filter else None
     try:
-        # Fetch all configuration types for the service if no specific type is provided
-        if not config_type:
-            endpoint = f"/clusters/{cluster_name}/configurations"
-            response_data = await make_ambari_request(endpoint)
+        # Acquire desired configs mapping
+        cluster_resp = await make_ambari_request(f"/clusters/{cluster_name}?fields=Clusters/desired_configs")
+        desired_configs = cluster_resp.get("Clusters", {}).get("desired_configs", {}) if cluster_resp else {}
+        if not desired_configs:
+            return "No desired_configs found in cluster."\
+ if config_type else "No configuration data found."  # single or bulk
 
-            if "error" in response_data:
-                return f"Error: Unable to retrieve configurations for service '{service_name}'. {response_data['error']}"
-
-            items = response_data.get("items", [])
+        # SINGLE TYPE MODE
+        if config_type:
+            if config_type not in desired_configs:
+                # fuzzy suggestions
+                suggestions = [t for t in desired_configs.keys() if config_type.lower() in t.lower()][:8]
+                return f"Config type '{config_type}' not found. Suggestions: {suggestions}" if suggestions else f"Config type '{config_type}' not found."
+            tag = desired_configs[config_type].get("tag")
+            if not tag:
+                return f"Config type '{config_type}' has no tag info."
+            cfg_resp = await make_ambari_request(f"/clusters/{cluster_name}/configurations?type={config_type}&tag={tag}")
+            items = cfg_resp.get("items", []) if cfg_resp else []
             if not items:
-                return f"No configurations found for service '{service_name}'."
+                return f"No items for config type '{config_type}' (tag={tag})."
+            props = items[0].get("properties", {}) or {}
+            prop_attrs = items[0].get("properties_attributes", {}) or {}
 
-            # Filter configuration types related to the service
-            config_types = [item.get("type", "Unknown") for item in items if service_name.lower() in item.get("type", "").lower()]
-
-            if not config_types:
-                return f"No configuration types found for service '{service_name}'."
-
-            result_lines = [f"Available configuration types for service '{service_name}':"]
-            result_lines.append("=" * 50)
-            for config_type in config_types:
-                result_lines.append(f"- {config_type}")
-
-            result_lines.append("\nTip: Use get_configurations again with the 'config_type' argument to fetch specific configuration values.")
-            return "\n".join(result_lines)
-
-        # Fetch the latest configuration values for the specified type
-        type_endpoint = f"/clusters/{cluster_name}/configurations?type={config_type}"
-        type_data = await make_ambari_request(type_endpoint)
-        items = type_data.get("items", []) if type_data else []
-        if not items:
-            return f"No configurations found for type '{config_type}'."
-
-        # Get the latest tag
-        latest_item = items[-1]
-        tag = latest_item.get("tag", "Unknown")
-        version = latest_item.get("version", "Unknown")
-
-        # Fetch configuration values for the latest tag
-        config_endpoint = f"/clusters/{cluster_name}/configurations?type={config_type}&tag={tag}"
-        config_data = await make_ambari_request(config_endpoint)
-        config_items = config_data.get("items", []) if config_data else []
-        if not config_items:
-            return f"No properties found for type '{config_type}' with tag '{tag}'."
-
-        result_lines = [f"Configuration values for type '{config_type}' (tag: {tag}, version: {version}):"]
-        result_lines.append("=" * 50)
-
-        for item in config_items:
-            properties = item.get("properties", {})
-            if properties:
-                result_lines.append("Properties:")
-                for k, v in properties.items():
-                    result_lines.append(f"  {k}: {v}")
-            else:
-                result_lines.append("No properties found.")
-
-            prop_attrs = item.get("properties_attributes", {})
+            # key filtering
+            if f_lc:
+                props = {k: v for k, v in props.items() if f_lc in k.lower() or f_lc in config_type.lower()}
+            lines = [f"CONFIG TYPE: {config_type}", f"Tag: {tag}", f"Keys: {len(props)}"]
+            lines.append("Properties:")
+            for k in sorted(props.keys()):
+                v = props[k]
+                v_disp = v.replace('\n', '\\n') if isinstance(v, str) else repr(v)
+                lines.append(f"  {k} = {v_disp}")
             if prop_attrs:
-                result_lines.append("Properties Attributes:")
-                for attr_type, attr_map in prop_attrs.items():
-                    result_lines.append(f"  [{attr_type}]")
-                    for k, v in attr_map.items():
-                        result_lines.append(f"    {k}: {v}")
+                lines.append("\nAttributes:")
+                for a_name, a_map in prop_attrs.items():
+                    lines.append(f"  [{a_name}]")
+                    for k, v in a_map.items():
+                        if f_lc and f_lc not in k.lower():
+                            continue
+                        lines.append(f"    {k}: {v}")
+            result = "\n".join(lines)
+            if len(result) > max_chars:
+                return result[:max_chars] + f"\n... [TRUNCATED {len(result)-max_chars} chars]"
+            return result
 
-        return "\n".join(result_lines)
+        # BULK MODE
+        type_names = sorted(desired_configs.keys())
+        if service_filter:
+            sf_lc = service_filter.lower()
+            type_names = [t for t in type_names if sf_lc in t.lower()]
+        emitted = 0
+        blocks: List[str] = []
+        for cfg_type in type_names:
+            tag = desired_configs[cfg_type].get("tag")
+            if not tag:
+                continue
+            cfg_resp = await make_ambari_request(f"/clusters/{cluster_name}/configurations?type={cfg_type}&tag={tag}")
+            items = cfg_resp.get("items", []) if cfg_resp else []
+            if not items:
+                continue
+            props = items[0].get("properties", {}) or {}
 
+            # Skip if filter specified and neither type nor any key matches
+            if f_lc and f_lc not in cfg_type.lower() and not any(f_lc in k.lower() for k in props.keys()):
+                continue
+
+            if summarize:
+                sample = list(props.keys())[:5]
+                blocks.append(f"[{cfg_type}] tag={tag} keys={len(props)} sample={sample}")
+            else:
+                if not include_values:
+                    keys = [k for k in sorted(props.keys()) if (not f_lc or f_lc in k.lower() or f_lc in cfg_type.lower())]
+                    blocks.append(f"[{cfg_type}] tag={tag} key_count={len(props)} keys={keys[:50]}")
+                else:
+                    lines = [f"[{cfg_type}] tag={tag} keys={len(props)}"]
+                    for k in sorted(props.keys()):
+                        if f_lc and f_lc not in k.lower() and f_lc not in cfg_type.lower():
+                            continue
+                        v = props[k]
+                        v_disp = v.replace('\n', '\\n') if isinstance(v, str) else repr(v)
+                        lines.append(f"  {k} = {v_disp}")
+                    blocks.append("\n".join(lines))
+
+            emitted += 1
+            if limit and emitted >= limit:
+                break
+
+        if not blocks:
+            return "No configuration data matched filter." if (filter or service_filter) else "No configuration data collected."
+
+        header = [
+            "AMBARI CONFIGURATION DUMP",
+            f"cluster={cluster_name}",
+            f"total_types_considered={len(desired_configs)}",
+            f"types_output={emitted}",
+            f"mode={'summarize' if summarize else ('full-values' if include_values else 'keys-only')}",
+        ]
+        if service_filter:
+            header.append(f"service_filter='{service_filter}'")
+        if filter:
+            header.append(f"filter='{filter}'")
+        result = "\n".join(header) + "\n\n" + "\n\n".join(blocks)
+        if len(result) > max_chars:
+            return result[:max_chars] + f"\n... [TRUNCATED {len(result)-max_chars} chars]"
+        return result
     except Exception as e:
-        return f"Error: Exception occurred while retrieving configurations - {str(e)}"
-
-@mcp.tool()
-async def list_configurations() -> str:
-    """
-    Lists all configuration types available in the cluster.
-
-    [Tool Role]: Dedicated tool for listing all Ambari cluster configuration types.
-
-    [Core Functions]:
-    - Retrieve all configuration types present in the cluster
-    - Provide formatted output for LLM automation and cluster management
-
-    [Required Usage Scenarios]:
-    - When users request cluster configuration types or overview
-    - When troubleshooting or auditing cluster settings
-    - When users mention config type list, cluster config, or available configs
-
-    Returns:
-        A list of all configuration types in the cluster (success: formatted list, failure: English error message)
-    """
-    cluster_name = AMBARI_CLUSTER_NAME
-    try:
-        endpoint = f"/clusters/{cluster_name}/configurations"
-        response_data = await make_ambari_request(endpoint)
-
-        if "error" in response_data:
-            return f"Error: Unable to retrieve cluster configurations. {response_data['error']}"
-
-        items = response_data.get("items", [])
-        if not items:
-            return f"No configurations found in cluster '{cluster_name}'."
-
-        config_types = [item.get("type", "Unknown") for item in items]
-
-        result_lines = ["Available configuration types in the cluster:"]
-        result_lines.append("=" * 50)
-        for config_type in config_types:
-            result_lines.append(f"- {config_type}")
-
-        return "\n".join(result_lines)
-
-    except Exception as e:
-        return f"Error: Exception occurred while listing cluster configurations - {str(e)}"
+        return f"[ERROR] dump_configurations failed: {e}"
 
 @mcp.tool()
 async def get_cluster_info() -> str:

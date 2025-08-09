@@ -31,14 +31,17 @@ Every tool call triggers a real Ambari REST API request. Call tools ONLY when ne
 | Track a specific request | get_request_status | Status & progress | After start/stop ops |
 | Host list | list_hosts | Host names | |
 | Host detail(s) | get_host_details(host_name?) | HW / metrics / components | No host → all |
-| List config types | list_configurations | Types list | |
-| Get configs (types / values) | get_configurations | Types or properties | If type omitted list types |
+| Config introspection (single or bulk) | dump_configurations | Types, keys, values | Use summarize=True for large dumps |
 
 ---
 ## 4. Decision Flow
 1. User asks about overall state / services → (a) wants all? get_cluster_services (b) mentions a single service? get_service_status.
 2. Mentions components / which host runs X → get_service_components or get_service_details.
-3. Mentions config / property / setting → list_configurations (global) or get_configurations(service, [type]).
+3. Mentions config / property / setting → dump_configurations.
+	- Single known type: dump_configurations(config_type="<type>")
+	- Explore broadly: dump_configurations(summarize=True)
+	- Narrow by substring: dump_configurations(filter="prop_or_type_fragment")
+	- Bulk but restrict to related types (e.g. yarn): dump_configurations(service_filter="yarn", summarize=True)
 4. Mentions host / node / a hostname → get_host_details(hostname). Wants all host details → get_host_details() with no arg.
 5. Mentions active / running operations → get_active_requests.
 6. Mentions a specific request ID → get_request_status.
@@ -76,7 +79,7 @@ Every tool call triggers a real Ambari REST API request. Call tools ONLY when ne
 → Call: get_active_requests → optionally follow with get_request_status for specific IDs
 
 ### F. User: "Show yarn.nodemanager.resource.memory-mb from yarn-site.xml"
-→ Call: get_configurations("YARN", config_type="yarn-site") then filter property in answer
+→ Call: dump_configurations(config_type="yarn-site", filter="yarn.nodemanager.resource.memory-mb") then extract value
 
 ---
 ## 7. Out-of-Scope Handling

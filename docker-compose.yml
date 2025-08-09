@@ -20,7 +20,7 @@ services:
       - "8000:8000"
     volumes:
       - ./mcp-config.json:/app/config/mcp-config.json
-      - ./tools:/app/tools
+      - ./src/mcp_ambari_api:/app/tools
     restart: always
 
 volumes:

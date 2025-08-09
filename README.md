@@ -8,8 +8,8 @@ Model Context Protocol (MCP) server for Apache Ambari API integration. This proj
 
 - Manage Hadoop services (start, stop, restart)
 - Monitor service and cluster status
-- Retrieve and update configurations
-- Track request progress
+- Unified configuration introspection (single type or bulk with filtering / summarization)
+- Track request progress (request IDs surfaced for all operations)
 
 ## Available MCP Tools
 
@@ -33,15 +33,22 @@ This MCP server provides the following tools for Ambari cluster management:
 - `restart_all_services` - Restart all services in the cluster
 
 ### Configuration Management
-- `get_configurations` - Retrieve service configuration types and values
-- `list_configurations` - List all available configuration types in the cluster
+- `dump_configurations` - Unified configuration tool (replaces `get_configurations`, `list_configurations`, and the former internal `dump_all_configurations`). Supports:
+  - Single type: `dump_configurations(config_type="yarn-site")`
+  - Bulk summary: `dump_configurations(summarize=True)`
+  - Filter by substring (type or key): `dump_configurations(filter="memory")`
+  - Service filter (narrow types by substring): `dump_configurations(service_filter="yarn", summarize=True)`
+  - Keys only (no values): `dump_configurations(include_values=False)`
+  - Limit number of types: `dump_configurations(limit=10, summarize=True)`
+
+> Breaking Change: `get_configurations` and `list_configurations` were removed in favor of this single, more capable tool.
 
 ### Host Management
 - `list_hosts` - List all hosts in the cluster
 - `get_host_details` - Get detailed information for specific or all hosts
 
 ## Prompt Template
-The package exposes a tool `get_prompt_template` that returns either the entire template, a specific section, or just the headings.
+The package exposes a tool `get_prompt_template` that returns either the entire template, a specific section, or just the headings. Three MCP prompts (`prompt_template_full`, `prompt_template_headings`, `prompt_template_section`) are also registered for discovery.
 
 ### MCP Prompts
 
@@ -68,6 +75,16 @@ Retrieve dynamically via MCP tool:
 - `get_prompt_template(mode="headings")` – list all section headings
 
 Policy: Only English is stored; LLM는 사용자 질의 언어와 무관하게 영어 지침을 내부 추론용으로 사용하고, 사용자 응답은 필요 시 다국어로 생성한다.
+
+### Configuration Tool Migration Notes
+
+| Removed | Replacement | Notes |
+|---------|-------------|-------|
+| `get_configurations` | `dump_configurations(config_type=...)` | Single type retrieval now goes through unified tool |
+| `list_configurations` | `dump_configurations(summarize=True)` | Summary listing of all types (sample keys) |
+| `dump_all_configurations` | `dump_configurations` | Renamed & expanded (adds service_filter, keys-only mode) |
+
+If you maintained automation calling the old tools, update to the unified form. The semantic output structure (plain text) remains similar; summary mode minimizes payload size, while full mode provides key=value pairs.
 
 ## Main Tool Files
 
@@ -98,8 +115,8 @@ Using this Ambari API integration is very simple and straightforward. If you alr
 
 ## Self QuickStart (Demo): Setting Up MCP Tools Environment with Docker
 
-This section describes how to set up the MCP Tools environment to control an Ambari cluster using OpenWebUI and MCPO, leveraging the provided `docker-compose.yml` and `Dockerfile`.
-
+  "command": "mcp-ambari-api",
+  "args": [],
 ### Tested Env.
 
 - WSL2 Linux on Windows11
@@ -111,6 +128,8 @@ To set up a Ambari Demo cluster, follow the guide at: [Install Ambari 3.0 with D
 
 ![Example: Ambari Demo Cluster](img/ex-ambari.png)
 
+
+If running inside the provided container image, the package is installed and exposes the `mcp-ambari-api` console script (entry point defined in `pyproject.toml`). Avoid invoking the module path directly to prevent relative import errors.
 Once your Ambari cluster is ready, check the following environment variables in your `mcp-config.json` file:
 
 ```json

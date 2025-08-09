@@ -34,3 +34,12 @@ def test_section_no_arg_help_format_matches_headings():
     assert 'Section Headings:' in headings
     numbered_lines = [ln for ln in headings.splitlines() if ln.strip().startswith('1.')]
     assert numbered_lines, 'Expected at least one numbered heading line'
+
+
+# New tests for unified configuration tool reference in template (string-level only; functional tests would require Ambari fixture)
+def test_template_references_dump_configurations_only():
+    txt = asyncio.run(get_prompt_template())
+    assert 'dump_configurations' in txt
+    assert 'get_configurations' not in txt
+    assert 'list_configurations' not in txt
+    assert 'dump_all_configurations' not in txt
