@@ -1362,25 +1362,43 @@ async def get_prompt_template(section: Optional[str] = None, mode: Optional[str]
 
 @mcp.prompt("prompt_template_full")
 async def prompt_template_full() -> str:
-    """Full canonical Ambari prompt template.
+    """Return the full canonical Ambari prompt template.
 
-    Appears in prompts/list as 'prompt_template_full'.
-    Use prompts/get with this name to retrieve entire template without a tool call decision cycle.
+    Usage (inspector): prompts/get name=prompt_template_full
+    When to use: Need complete guidance context or to re-anchor the assistant.
     """
     return await get_prompt_template()
 
 @mcp.prompt("prompt_template_headings")
 async def prompt_template_headings() -> str:
-    """List section headings of the canonical template."""
+    """List only the numbered section headings in order.
+
+    Usage: prompts/get name=prompt_template_headings
+    When to use: Quickly discover available sections before fetching one.
+    """
     return await get_prompt_template(mode="headings")
 
 @mcp.prompt("prompt_template_section")
-async def prompt_template_section(section: str) -> str:
-    """Return a specific section of the canonical template.
+async def prompt_template_section(section: Optional[str] = None) -> str:
+    """Return a specific section by number or keyword.
 
-    Args:
-        section: Number or keyword (e.g. '1', 'purpose', 'tool map').
+    Usage examples (inspector):
+      prompts/get name=prompt_template_section arguments={"section":"1"}
+      prompts/get name=prompt_template_section arguments={"section":"tool map"}
+      prompts/get name=prompt_template_section arguments={"section":"decision flow"}
+
+    If 'section' is omitted, returns a short help plus headings list instead of erroring.
     """
+    if not section:
+        headings = await get_prompt_template(mode="headings")
+        help_text = [
+            "Missing 'section' argument.",
+            "Provide a section number or keyword.",
+            "Examples: 1 | purpose | tool map | decision flow",
+            "---",
+            headings
+        ]
+        return "\n".join(help_text)
     return await get_prompt_template(section=section)
 
 # =============================================================================
