@@ -45,7 +45,7 @@ This MCP server provides the following tools for Ambari cluster management:
 
 ### Host Management
 - `list_hosts` - List all hosts in the cluster
-- `get_host_details` - Get detailed information for specific or all hosts
+- `get_host_details` - Get detailed information for specific or all hosts (includes component states, hardware metrics, and service assignments)
 
 ## Prompt Template
 The package exposes a tool `get_prompt_template` that returns either the entire template, a specific section, or just the headings. Three MCP prompts (`prompt_template_full`, `prompt_template_headings`, `prompt_template_section`) are also registered for discovery.

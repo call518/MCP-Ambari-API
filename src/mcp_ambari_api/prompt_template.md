@@ -30,7 +30,7 @@ Every tool call triggers a real Ambari REST API request. Call tools ONLY when ne
 | Running operations | get_active_requests | Active request list | |
 | Track a specific request | get_request_status | Status & progress | After start/stop ops |
 | Host list | list_hosts | Host names | |
-| Host detail(s) | get_host_details(host_name?) | HW / metrics / components | No host → all |
+| Host detail(s) | get_host_details(host_name?) | HW / metrics / components with states | No host → all hosts |
 | Config introspection (single or bulk) | dump_configurations | Types, keys, values | Use summarize=True for large dumps |
 
 ---
@@ -42,7 +42,7 @@ Every tool call triggers a real Ambari REST API request. Call tools ONLY when ne
 	- Explore broadly: dump_configurations(summarize=True)
 	- Narrow by substring: dump_configurations(filter="prop_or_type_fragment")
 	- Bulk but restrict to related types (e.g. yarn): dump_configurations(service_filter="yarn", summarize=True)
-4. Mentions host / node / a hostname → get_host_details(hostname). Wants all host details → get_host_details() with no arg.
+4. Mentions host / node / a hostname → get_host_details(hostname). Wants all host details → get_host_details() with no arg. Shows component states (STARTED/STOPPED/INSTALLED) for each host.
 5. Mentions active / running operations → get_active_requests.
 6. Mentions a specific request ID → get_request_status.
 7. Explicit start / stop / restart + service name → corresponding single-service tool.
@@ -75,10 +75,13 @@ Every tool call triggers a real Ambari REST API request. Call tools ONLY when ne
 ### D. User: "Details for host bigtop-hostname0"
 → Call: get_host_details("bigtop-hostname0.demo.local" or matching actual name)
 
-### E. User: "Any running operations?"
+### E. User: "Show component status on each host" / "각 호스트별로 컴포넌트 운영 상태 표시"
+→ Call: get_host_details() (no argument to get all hosts with component states)
+
+### F. User: "Any running operations?"
 → Call: get_active_requests → optionally follow with get_request_status for specific IDs
 
-### F. User: "Show yarn.nodemanager.resource.memory-mb from yarn-site.xml"
+### G. User: "Show yarn.nodemanager.resource.memory-mb from yarn-site.xml"
 → Call: dump_configurations(config_type="yarn-site", filter="yarn.nodemanager.resource.memory-mb") then extract value
 
 ---

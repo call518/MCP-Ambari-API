@@ -96,7 +96,8 @@ async def format_single_host_details(host_name: str, cluster_name: str, show_hea
         Formatted host details string
     """
     try:
-        endpoint = f"/clusters/{cluster_name}/hosts/{host_name}"
+        # Include host component states and service names in the request
+        endpoint = f"/clusters/{cluster_name}/hosts/{host_name}?fields=Hosts,host_components/HostRoles/state,host_components/HostRoles/service_name,host_components/HostRoles/component_name,host_components/HostRoles/actual_configs,metrics,alerts_summary,kerberos_identities"
         response_data = await make_ambari_request(endpoint)
 
         if response_data is None or "error" in response_data:
