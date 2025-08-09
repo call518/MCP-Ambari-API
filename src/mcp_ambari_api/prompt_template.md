@@ -75,7 +75,7 @@ Every tool call triggers a real Ambari REST API request. Call tools ONLY when ne
 ### D. User: "Details for host bigtop-hostname0"
 → Call: get_host_details("bigtop-hostname0.demo.local" or matching actual name)
 
-### E. User: "Show component status on each host" / "각 호스트별로 컴포넌트 운영 상태 표시"
+### E. User: "Show component status on each host"
 → Call: get_host_details() (no argument to get all hosts with component states)
 
 ### F. User: "Any running operations?"
