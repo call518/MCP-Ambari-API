@@ -3,9 +3,9 @@ from mcp_ambari_api import get_prompt_template
 import asyncio
 
 
-def test_full_template_contains_version():
+def test_full_template_loads():
     txt = asyncio.run(get_prompt_template())
-    assert 'Template-Version:' in txt
+    assert 'Purpose' in txt and 'Tool Map' in txt
 
 
 def test_headings_mode():

@@ -1,8 +1,3 @@
-<!--
-Template-Version: 1.0.0
-Last-Updated: 2025-08-09
--->
-
 # MCP Ambari API Prompt Template (English - Default)
 
 Canonical English prompt template for the Ambari MCP server. Use this file as the primary system/developer prompt to guide tool selection and safety behavior.
@@ -106,10 +101,6 @@ Query: "Restart HDFS and show progress"
 ---
 ## 10. Meta
 Keep this template updated when new tools are added (update Sections 3 & 4). Can be delivered via the get_prompt_template MCP tool.
-
-Version Metadata:
-- Template-Version: 1.0.0
-- Last-Updated: 2025-08-09
 
 ---
 END OF PROMPT TEMPLATE
