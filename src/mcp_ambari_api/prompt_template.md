@@ -56,6 +56,12 @@ Every tool call triggers a real Ambari REST API request. Call tools ONLY when ne
 1. Final answer: (1–2 line summary) + (optional structured lines/table) + (suggested follow-up tool).
 2. When multiple tools needed: briefly state plan, then present consolidated results.
 3. For disruptive / bulk changes: add a warning line: "Warning: Bulk service {start|stop|restart} initiated; may take several minutes." 
+4. ALWAYS surface any Ambari operation request ID(s) returned by a tool near the top of the answer (line 1–4). Format:
+	- Single: `Request ID: <id>`
+	- Multiple (restart sequences / bulk): `Stop Request ID: <id_stop>` and `Start Request ID: <id_start>` each on its own line.
+5. If an ID is unknown (field missing) show `Request ID: Unknown` (do NOT fabricate).
+6. When user re-asks about an ongoing operation without ID: echo a concise status line `Request <id>: <status> <progress>%` if available.
+7. Always end operational answers with a next-step hint: `Next: get_request_status(<id>) for updates.`
 
 ---
 ## 6. Few-shot Examples

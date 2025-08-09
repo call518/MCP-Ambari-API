@@ -26,6 +26,7 @@ jobs:
       - name: Inject version into pyproject.toml
         run: |
           sed -i "s|^version = \".*\"|version = \"${VERSION}\"|" pyproject.toml
+          cp -f mcp-config.json.pypi mcp-config.json
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11.x"

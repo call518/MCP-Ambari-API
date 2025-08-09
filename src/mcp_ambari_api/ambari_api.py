@@ -1083,7 +1083,7 @@ async def restart_service(service_name: str) -> str:
             logger.info("Stopping service '%s'... Progress: %d%%", service_name, progress_percent)
             await asyncio.sleep(2)  # Wait for 5 seconds before checking again
 
-        # Step 3: Start the service (no progress output, fire and forget)
+    # Step 3: Start the service (no progress output beyond capturing request id)
         start_endpoint = f"/clusters/{cluster_name}/services/{service_name}"
         start_payload = {
             "RequestInfo": {
@@ -1106,9 +1106,25 @@ async def restart_service(service_name: str) -> str:
         if "error" in start_response:
             return f"Error: Unable to start service '{service_name}'. {start_response['error']}"
 
-        # No need to wait for start completion or print progress
+        start_request_id = start_response.get("Requests", {}).get("id", "Unknown")
+        start_status = start_response.get("Requests", {}).get("status", "Unknown")
+        start_href = start_response.get("href", "")
+
         logger.info("Service '%s' successfully restarted.", service_name)
-        return f"Service '{service_name}' restart operation completed successfully."
+        result_lines = [
+            f"RESTART SERVICE: {service_name}",
+            f"Stop Request ID: {stop_request_id}",
+            f"Start Request ID: {start_request_id}",
+            "",
+            f"Cluster: {cluster_name}",
+            f"Service: {service_name}",
+            f"Stop Status: COMPLETED",  # by this point stop loop exited on COMPLETED
+            f"Start Status: {start_status}",
+            f"Start Monitor URL: {start_href}",
+            "",
+            f"Next: get_request_status({start_request_id}) for updates." if start_request_id != "Unknown" else "Next: get_service_status(\"{service_name}\") to verify state soon.",
+        ]
+        return "\n".join(result_lines)
 
     except Exception as e:
         logger.error("Error occurred while restarting service '%s': %s", service_name, str(e))
@@ -1164,13 +1180,33 @@ async def restart_all_services() -> str:
                 return f"Error: Stop operation for all services failed. {status_result}"
             await asyncio.sleep(2)
 
-        # Step 2: Start all services (no progress output, fire and forget)
+        # Step 2: Start all services (capture request id)
         start_result = await start_all_services()
         if start_result.startswith("Error"):
             return f"Error: Unable to start all services. {start_result}"
 
-        # No need to wait for start completion or print progress
-        return "All services restart operation completed successfully."
+        # Extract start request ID
+        start_lines = start_result.splitlines()
+        start_request_id = None
+        for line in start_lines:
+            if line.startswith("Request ID:"):
+                start_request_id = line.split(":", 1)[1].strip()
+                break
+        if not start_request_id:
+            start_request_id = "Unknown"
+
+        summary_lines = [
+            "RESTART ALL SERVICES", "",
+            f"Stop Request ID: {stop_request_id}",
+            f"Start Request ID: {start_request_id}",
+            "",
+            "Note: Start phase is now in progress; may take several minutes.",
+        ]
+        if start_request_id != "Unknown":
+            summary_lines.append(f"Next: get_request_status({start_request_id}) for updates.")
+        else:
+            summary_lines.append("Next: get_active_requests to monitor overall progress.")
+        return "\n".join(summary_lines)
 
     except Exception as e:
         return f"Error: All services restart operation failed: {str(e)}"
