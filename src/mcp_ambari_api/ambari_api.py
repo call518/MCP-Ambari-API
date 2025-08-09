@@ -1387,29 +1387,13 @@ async def prompt_template_section(section: Optional[str] = None) -> str:
     If 'section' is omitted: returns a concise help block plus a compact headings list instead of erroring.
     """
     if not section:
-        raw = await get_prompt_template(mode="headings")
-        lines = [l.strip() for l in raw.splitlines() if l.strip() and not l.startswith("Section Headings:")]
-        compact_parts = []
-        for l in lines:
-            first = l.split(None, 1)
-            if len(first) == 2 and first[0].endswith('.'):
-                remainder = first[1]
-                if remainder and remainder[0].isdigit() and remainder[1:3] == '. ':
-                    remainder = remainder.split(' ', 1)[1] if ' ' in remainder else remainder
-            else:
-                remainder = l
-            index_token = l.split('.', 1)[0]
-            if not index_token.isdigit():
-                import re
-                m = re.search(r'^(\d+)', l)
-                index_token = m.group(1) if m else '?'
-            compact_parts.append(f"{index_token} {remainder.strip()}")
-        compact = " | ".join(compact_parts)
+        headings_block = await get_prompt_template(mode="headings")
+        # Reuse exact multi-line format from prompt_template_headings for consistency.
         return "\n".join([
             "[HELP] Missing 'section' argument.",
             "Specify a section number or keyword.",
             "Examples: 1 | purpose | tool map | decision flow",
-            f"Headings: {compact}"
+            headings_block.strip()
         ])
     return await get_prompt_template(section=section)
 

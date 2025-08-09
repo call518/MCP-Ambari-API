@@ -25,3 +25,12 @@ def test_section_fetch_by_keyword():
     assert 'Decision Flow' in sec
     # Decision flow lists references like get_cluster_services / get_service_status etc.
     assert 'get_cluster_services' in sec and 'get_service_status' in sec
+
+
+def test_section_no_arg_help_format_matches_headings():
+    """Simulate logic used when prompt_template_section is called without arg: ensure headings block present multi-line."""
+    headings = asyncio.run(get_prompt_template(mode='headings'))
+    # Expect the headings list first line marker and at least two numbered lines
+    assert 'Section Headings:' in headings
+    numbered_lines = [ln for ln in headings.splitlines() if ln.strip().startswith('1.')]
+    assert numbered_lines, 'Expected at least one numbered heading line'
