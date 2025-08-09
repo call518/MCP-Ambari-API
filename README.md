@@ -1,5 +1,7 @@
 [![Deploy to PyPI with tag](https://github.com/call518/MCP-Ambari-API/actions/workflows/pypi-publish.yml/badge.svg)](https://github.com/call518/MCP-Ambari-API/actions/workflows/pypi-publish.yml)
 
+[![smithery badge](https://smithery.ai/badge/@call518/mcp-ambari-api)](https://smithery.ai/server/@call518/mcp-ambari-api)
+
 # MCP Ambari API
 
 Model Context Protocol (MCP) server for Apache Ambari API integration. This project provides tools for managing Hadoop clusters, including service operations, configuration management, status monitoring, and request tracking.
