@@ -40,6 +40,24 @@ This MCP server provides the following tools for Ambari cluster management:
 - `list_hosts` - List all hosts in the cluster
 - `get_host_details` - Get detailed information for specific or all hosts
 
+## Prompt Template
+
+Single canonical English prompt template guides safe and efficient tool selection.
+
+Files:
+
+- Packaged: `src/mcp_ambari_api/prompt_template.md` (distributed with PyPI)
+- (Optional workspace root copy `PROMPT_TEMPLATE.md` may exist for editing; packaged copy is the one loaded at runtime.)
+
+Retrieve dynamically via MCP tool:
+
+- `get_prompt_template()` – full template
+- `get_prompt_template("tool map")` – only the tool mapping section
+- `get_prompt_template("5")` – section 5 (formatting guidelines)
+- `get_prompt_template(mode="headings")` – list all section headings
+
+Policy: Only English is stored; LLM는 사용자 질의 언어와 무관하게 영어 지침을 내부 추론용으로 사용하고, 사용자 응답은 필요 시 다국어로 생성한다.
+
 ## Main Tool Files
 
 - **Main MCP tool file**: `src/mcp_ambari_api/ambari_api.py`

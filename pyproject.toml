@@ -13,9 +13,18 @@ dependencies = [
     "fastmcp>=2.11.1",
 ]
 
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.2.0"
+]
+
 [project.scripts]
 mcp-ambari-api = "mcp_ambari_api.ambari_api:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["mcp_ambari_api*"]
+
+[tool.setuptools]
+include-package-data = true
+

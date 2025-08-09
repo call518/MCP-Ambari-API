@@ -1,6 +1,7 @@
 from typing import Dict, Optional
 from mcp.server.fastmcp import FastMCP
 import os
+import importlib.resources as pkg_resources
 import asyncio  # Add this import at the top of the file to use asyncio.sleep
 import logging
 from .functions import (
@@ -755,7 +756,7 @@ async def stop_all_services() -> str:
                 }
             }
             
-            stop_response = await make_ambari_request(alt_endpoint, method="PUT", data=alt_payload)
+            stop_response = await make_ambari_request(alt_endpoint, method="PUT", data=stop_payload)
             
             if stop_response.get("error"):
                 return f"Error: Failed to stop services in cluster '{cluster_name}'. {stop_response['error']}"
@@ -1297,6 +1298,63 @@ async def get_host_details(host_name: Optional[str] = None) -> str:
 
     except Exception as e:
         return f"Error: Exception occurred while retrieving host details - {str(e)}"
+
+@mcp.tool()
+async def get_prompt_template(section: Optional[str] = None, mode: Optional[str] = None) -> str:
+    """Return the canonical English prompt template (optionally a specific section).
+
+    Simplified per project decision: only a single English template file `PROMPT_TEMPLATE.md` is maintained.
+
+    Args:
+        section: (optional) section number or keyword (case-insensitive) e.g. "1", "purpose", "tool map".
+        mode: (optional) if "headings" returns just the list of section headings with numeric indices.
+    """
+    # Template is packaged as mcp_ambari_api/prompt_template.md for PyPI distribution
+    try:
+        content = pkg_resources.files('mcp_ambari_api').joinpath('prompt_template.md').read_text(encoding='utf-8')  # type: ignore[arg-type]
+    except FileNotFoundError:
+        return "Error: prompt_template.md not found inside package mcp_ambari_api." 
+    except Exception as e:
+        return f"Error: Unable to read packaged prompt_template.md - {e}" 
+
+    if mode == 'headings':
+        headings = [line[3:].strip() for line in content.splitlines() if line.startswith('## ')]
+        lines = ["Section Headings:"]
+        for idx, h in enumerate(headings, 1):
+            lines.append(f"{idx}. {h}")
+        return "\n".join(lines)
+
+    if not section:
+        return content
+
+    lowered = section.lower().strip()
+    sections = {}
+    current_key = None
+    accumulator = []
+    for line in content.splitlines():
+        if line.startswith('## '):
+            if current_key:
+                sections[current_key] = '\n'.join(accumulator).strip()
+            title = line[3:].strip()
+            key = title.lower()
+            sections[key] = ''
+            if key and key[0].isdigit():
+                num = key.split('.', 1)[0]
+                sections[num] = ''
+            current_key = key
+            accumulator = [line]
+        else:
+            accumulator.append(line)
+    if current_key:
+        sections[current_key] = '\n'.join(accumulator).strip()
+
+    if lowered in sections and sections[lowered]:
+        return sections[lowered]
+    for k, v in sections.items():
+        if lowered in k and v:
+            return v
+    sample_keys = ', '.join(list(sections.keys())[:8])
+    return f"Section '{section}' not found. Available sample keys: {sample_keys}"
 
 # =============================================================================
 # Server Execution
