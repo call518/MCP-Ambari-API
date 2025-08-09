@@ -35,10 +35,12 @@ startCommand:
         type: string
         description: "Ambari server port"
         default: "8080"
+        secret: true
       ambariUser:
         type: string
         description: "Ambari username"
         default: admin
+        secret: true
       ambariPass:
         type: string
         description: "Ambari password"
@@ -48,6 +50,7 @@ startCommand:
         type: string
         description: "Ambari cluster name"
         default: TEST-AMBARI
+        secret: true
   commandFunction: |-
     (config) => {
       // Always use the installed console script from PyPI.
