@@ -47,10 +47,6 @@ startCommand:
         type: string
         description: "Ambari cluster name"
         default: TEST-AMBARI
-      packageVersion:
-        type: string
-        description: "Optional explicit PyPI version (e.g. '0.1.2'); omit or 'latest' for newest"
-        default: latest
   commandFunction: |-
     (config) => {
       // Always use the installed console script from PyPI.
@@ -70,7 +66,6 @@ startCommand:
     ambariUser: admin
     ambariPass: admin
     ambariClusterName: TEST-AMBARI
-    # packageVersion: latest
 
 ## Notes:
 ## - Set ambariPass via Smithery secret storage if available.
