@@ -143,6 +143,40 @@ Once your Ambari cluster is ready, check the following environment variables in 
 ```
 Make sure these values match your Ambari cluster setup.
 
+### Logging & Observability
+
+The server emits structured log lines for every tool invocation and HTTP request helper:
+
+- Prefixes: `TOOL START`, `TOOL SUCCESS`, `TOOL ERROR_RETURN`, `TOOL EXCEPTION`
+- Each line includes elapsed time (ms) and basic size metadata.
+- Under DEBUG level, additional HTTP request diagnostics (endpoint, status, timing) are printed.
+
+Control log verbosity via either environment variable or CLI flag:
+
+| Method | Example |
+|--------|---------|
+| Environment variable | `export AMBARI_LOG_LEVEL=DEBUG` |
+| CLI flag (takes precedence) | `mcp-ambari-api --log-level DEBUG` |
+| Smithery config (added property) | Set `AMBARI_LOG_LEVEL` to desired level |
+
+Supported levels: DEBUG, INFO (default), WARNING, ERROR, CRITICAL.
+
+Recommendations:
+- Use DEBUG temporarily when diagnosing failed Ambari requests or performance.
+- Keep INFO for normal operations (includes start/success summaries only).
+- Elevate to WARNING/ERROR in very noisy multi-tenant environments.
+
+Example (one-off):
+```bash
+AMBARI_LOG_LEVEL=DEBUG mcp-ambari-api
+```
+or
+```bash
+mcp-ambari-api --log-level DEBUG
+```
+
+Smithery now passes the selected `AMBARI_LOG_LEVEL` both as env and `--log-level` flag so runtime overrides take effect immediately.
+
 ### 2. MCP Tools Environment Setup
 
 1. Ensure Docker and Docker Compose are installed on your system.

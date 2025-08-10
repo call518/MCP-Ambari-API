@@ -1,4 +1,5 @@
 from typing import Dict, Optional, List
+import argparse
 from mcp.server.fastmcp import FastMCP
 import os
 import importlib.resources as pkg_resources
@@ -13,7 +14,7 @@ from .functions import (
     AMBARI_CLUSTER_NAME
 )
 
-# Set up logging
+# Set up logging (initial level from env; may be overridden by --log-level)
 logging.basicConfig(
     level=os.environ.get("AMBARI_LOG_LEVEL", "INFO"),
     format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
@@ -1487,10 +1488,31 @@ async def prompt_template_section(section: Optional[str] = None) -> str:
 # Server Execution
 # =============================================================================
 
-def main():
+def main(argv: Optional[List[str]] = None):
+    """Entrypoint for MCP Ambari API server.
+
+    Supports optional CLI arguments (e.g. --log-level DEBUG) while remaining
+    backward-compatible with stdio launcher expectations.
     """
-    Entrypoint for MCP Ambari API server.
-    """
+    parser = argparse.ArgumentParser(prog="mcp-ambari-api", description="MCP Ambari API Server")
+    parser.add_argument(
+        "--log-level", "-l",
+        dest="log_level",
+        help="Logging level override (DEBUG, INFO, WARNING, ERROR, CRITICAL). Overrides AMBARI_LOG_LEVEL env if provided.",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+    )
+    # Allow future extension without breaking unknown args usage
+    args = parser.parse_args(argv)
+
+    if args.log_level:
+        # Override root + specific logger level
+        logging.getLogger().setLevel(args.log_level)
+        logger.setLevel(args.log_level)
+        logging.getLogger("aiohttp.client").setLevel("WARNING")  # reduce noise at DEBUG
+        logger.info("Log level set via CLI to %s", args.log_level)
+    else:
+        logger.debug("Log level from environment: %s", logging.getLogger().level)
+
     mcp.run(transport='stdio')
 
 if __name__ == "__main__":
