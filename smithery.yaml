@@ -20,33 +20,33 @@ startCommand:
   configSchema:
     type: object
     required:
-      - ambariHost
-      - ambariPort
-      - ambariUser
-      - ambariPass
-      - ambariClusterName
+      - AMBARI_HOST
+      - AMBARI_PORT
+      - AMBARI_USER
+      - AMBARI_PASS
+      - AMBARI_CLUSTER_NAME
     properties:
-      ambariHost:
+      AMBARI_HOST:
         type: string
         description: "Ambari server hostname or IP (e.g. host.docker.internal)"
         default: 127.0.0.1
         secret: true
-      ambariPort:
+      AMBARI_PORT:
         type: string
         description: "Ambari server port"
         default: "8080"
         secret: true
-      ambariUser:
+      AMBARI_USER:
         type: string
         description: "Ambari username"
         default: admin
         secret: true
-      ambariPass:
+      AMBARI_PASS:
         type: string
         description: "Ambari password"
         default: admin
         secret: true
-      ambariClusterName:
+      AMBARI_CLUSTER_NAME:
         type: string
         description: "Ambari cluster name"
         default: TEST-AMBARI
@@ -56,22 +56,22 @@ startCommand:
       // Always use the installed console script from PyPI.
       // (Smithery environment must have already run: pip install mcp-ambari-api[latest|==version])
       const env = {
-        AMBARI_HOST: config.ambariHost,
-        AMBARI_PORT: config.ambariPort,
-        AMBARI_USER: config.ambariUser,
-        AMBARI_PASS: config.ambariPass,
-        AMBARI_CLUSTER_NAME: config.ambariClusterName
+        AMBARI_HOST: config.AMBARI_HOST,
+        AMBARI_PORT: config.AMBARI_PORT,
+        AMBARI_USER: config.AMBARI_USER,
+        AMBARI_PASS: config.AMBARI_PASS,
+        AMBARI_CLUSTER_NAME: config.AMBARI_CLUSTER_NAME
       };
       return { command: 'mcp-ambari-api', args: [], env };
     }
   exampleConfig:
-    ambariHost: host.docker.internal
-    ambariPort: "8080"
-    ambariUser: admin
-    ambariPass: admin
-    ambariClusterName: TEST-AMBARI
+    AMBARI_HOST: host.docker.internal
+    AMBARI_PORT: "8080"
+    AMBARI_USER: admin
+    AMBARI_PASS: admin
+    AMBARI_CLUSTER_NAME: TEST-AMBARI
 
 ## Notes:
-## - Set ambariPass via Smithery secret storage if available.
-## - Adjust ambariHost/Port for your environment.
+## - Set AMBARI_PASS via Smithery secret storage if available.
+## - Adjust AMBARI_HOST/PORT for your environment.
 ## - Ensure the hosting environment installs the package: pip install mcp-ambari-api (optionally pin a version).
