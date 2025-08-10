@@ -29,7 +29,7 @@ startCommand:
       ambariHost:
         type: string
         description: "Ambari server hostname or IP (e.g. host.docker.internal)"
-        default: 127.0.0.1
+        default: host.docker.internal
         secret: true
       ambariPort:
         type: string
