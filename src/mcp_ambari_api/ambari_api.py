@@ -4,6 +4,8 @@ import os
 import importlib.resources as pkg_resources
 import asyncio  # Add this import at the top of the file to use asyncio.sleep
 import logging
+import time
+from functools import wraps
 from .functions import (
     format_timestamp, 
     format_single_host_details, 
@@ -12,8 +14,49 @@ from .functions import (
 )
 
 # Set up logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=os.environ.get("AMBARI_LOG_LEVEL", "INFO"),
+    format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
+)
 logger = logging.getLogger("AmbariService")
+
+# -----------------------------------------------------------------------------
+# Decorator for uniform tool call logging
+# -----------------------------------------------------------------------------
+def log_tool(func):
+    tool_name = func.__name__
+
+    @wraps(func)
+    async def wrapper(*args, **kwargs):
+        start = time.monotonic()
+        # Avoid logging huge argument content; simple key=... pairs
+        try:
+            arg_preview = []
+            if kwargs:
+                for k, v in kwargs.items():
+                    if v is None:
+                        continue
+                    sv = str(v)
+                    if len(sv) > 120:
+                        sv = sv[:117] + '…'
+                    arg_preview.append(f"{k}={sv}")
+            logger.info(f"TOOL START {tool_name} {' '.join(arg_preview)}")
+            result = await func(*args, **kwargs)
+            duration_ms = (time.monotonic() - start) * 1000
+            # Categorize result
+            if isinstance(result, str) and result.startswith("Error:"):
+                logger.warning(f"TOOL ERROR_RETURN {tool_name} took={duration_ms:.1f}ms len={len(result)}")
+            elif isinstance(result, str) and result.startswith("[ERROR]"):
+                logger.warning(f"TOOL ERROR_RETURN {tool_name} took={duration_ms:.1f}ms len={len(result)}")
+            else:
+                logger.info(f"TOOL SUCCESS {tool_name} took={duration_ms:.1f}ms len={len(result) if hasattr(result,'__len__') else 'NA'}")
+            return result
+        except Exception:
+            duration_ms = (time.monotonic() - start) * 1000
+            logger.exception(f"TOOL EXCEPTION {tool_name} failed after {duration_ms:.1f}ms")
+            raise
+
+    return wrapper
 
 # =============================================================================
 # Server Initialization
@@ -27,6 +70,7 @@ mcp = FastMCP("ambari-api")
 
 
 @mcp.tool()
+@log_tool
 async def dump_configurations(
     config_type: Optional[str] = None,
     service_filter: Optional[str] = None,
@@ -164,6 +208,7 @@ async def dump_configurations(
         return f"[ERROR] dump_configurations failed: {e}"
 
 @mcp.tool()
+@log_tool
 async def get_cluster_info() -> str:
     """
     Retrieves basic information for an Ambari cluster.
@@ -209,6 +254,7 @@ async def get_cluster_info() -> str:
         return f"Error: Exception occurred while retrieving cluster information - {str(e)}"
 
 @mcp.tool()
+@log_tool
 async def get_active_requests() -> str:
     """
     Retrieves currently active (in progress) requests/operations in an Ambari cluster.
@@ -288,6 +334,7 @@ async def get_active_requests() -> str:
         return f"Error: Exception occurred while retrieving active requests - {str(e)}"
 
 @mcp.tool()
+@log_tool
 async def get_cluster_services() -> str:
     """
     Retrieves the list of services with status in an Ambari cluster.
@@ -351,6 +398,7 @@ async def get_cluster_services() -> str:
         return f"Error: Exception occurred while retrieving service list - {str(e)}"
 
 @mcp.tool()
+@log_tool
 async def get_service_status(service_name: str) -> str:
     """
     Retrieves the status information for a specific service in an Ambari cluster.
@@ -411,6 +459,7 @@ async def get_service_status(service_name: str) -> str:
         return f"Error: Exception occurred while retrieving service status - {str(e)}"
 
 @mcp.tool()
+@log_tool
 async def get_service_components(service_name: str) -> str:
     """
     Retrieves detailed components information for a specific service in the Ambari cluster.
@@ -520,6 +569,7 @@ async def get_service_components(service_name: str) -> str:
         return f"Error: Exception occurred while retrieving components for service '{service_name}' - {str(e)}"
 
 @mcp.tool()
+@log_tool
 async def get_service_details(service_name: str) -> str:
     """
     Retrieves detailed status and configuration information for a specific service in the Ambari cluster.
@@ -604,6 +654,7 @@ async def get_service_details(service_name: str) -> str:
         return f"Error: Exception occurred while retrieving service details - {str(e)}"
 
 @mcp.tool()
+@log_tool
 async def start_all_services() -> str:
     """
     Starts all services in an Ambari cluster (equivalent to "Start All" in Ambari Web UI).
@@ -687,6 +738,7 @@ async def start_all_services() -> str:
         return f"Error: Exception occurred while starting all services - {str(e)}"
 
 @mcp.tool()
+@log_tool
 async def stop_all_services() -> str:
     """
     Stops all services in an Ambari cluster (equivalent to "Stop All" in Ambari Web UI).

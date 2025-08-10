@@ -8,6 +8,7 @@ import aiohttp
 import json
 import datetime
 import logging
+import time
 from typing import Dict, Optional
 from base64 import b64encode
 
@@ -55,6 +56,8 @@ async def make_ambari_request(endpoint: str, method: str = "GET", data: Optional
     Returns:
         API response data (JSON format) or {"error": "error_message"} on error
     """
+    start = time.monotonic()
+    logger.debug(f"AMBARI_REQ start method={method} endpoint={endpoint} payload_keys={list(data.keys()) if data else []}")
     try:
         auth_string = f"{AMBARI_USER}:{AMBARI_PASS}"
         auth_bytes = auth_string.encode('ascii')
@@ -73,13 +76,25 @@ async def make_ambari_request(endpoint: str, method: str = "GET", data: Optional
                 kwargs['data'] = json.dumps(data)
                 
             async with session.request(method, url, **kwargs) as response:
+                elapsed = (time.monotonic() - start) * 1000
                 if response.status in [200, 202]:  # Accept both OK and Accepted
-                    return await response.json()
+                    try:
+                        js = await response.json()
+                    except Exception as je:
+                        text_body = await response.text()
+                        logger.warning(f"AMBARI_REQ json-parse-fallback status={response.status} took={elapsed:.1f}ms endpoint={endpoint} err={je}")
+                        return {"error": f"JSON_PARSE: {je}", "raw": text_body}
+                    size_hint = len(str(js)) if js else 0
+                    logger.debug(f"AMBARI_REQ success status={response.status} took={elapsed:.1f}ms size={size_hint}")
+                    return js
                 else:
                     error_text = await response.text()
+                    logger.warning(f"AMBARI_REQ http-error status={response.status} took={elapsed:.1f}ms endpoint={endpoint} body_len={len(error_text)}")
                     return {"error": f"HTTP {response.status}: {error_text}"}
                     
     except Exception as e:
+        elapsed = (time.monotonic() - start) * 1000
+        logger.exception(f"AMBARI_REQ exception took={elapsed:.1f}ms endpoint={endpoint}")
         return {"error": f"Request failed: {str(e)}"}
 
 
