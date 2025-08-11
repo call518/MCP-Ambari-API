@@ -108,7 +108,8 @@ Using this Ambari API integration is very simple and straightforward. If you alr
         "AMBARI_PORT": "8080",
         "AMBARI_USER": "admin",
         "AMBARI_PASS": "admin",
-        "AMBARI_CLUSTER_NAME": "TEST-AMBARI"
+        "AMBARI_CLUSTER_NAME": "TEST-AMBARI",
+        "AMBARI_LOG_LEVEL": "INFO"
       }
     }
   }
