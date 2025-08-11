@@ -28,3 +28,8 @@ include = ["mcp_ambari_api*"]
 [tool.setuptools]
 include-package-data = true
 
+[tool.setuptools.package-data]
+# Ensure non-Python resource files ship inside the wheel
+# You can broaden to ["*.md"] if more markdown resources are added later.
+mcp_ambari_api = ["prompt_template.md"]
+
