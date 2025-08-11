@@ -100,7 +100,7 @@ Using this Ambari API integration is very simple and straightforward. If you alr
 ```json
 {
   "mcpServers": {
-    "ambar-api": {
+    "ambari-api": {
       "command": "uvx",
       "args": ["--python", "3.11", "mcp-ambari-api"],
       "env": {
@@ -193,7 +193,7 @@ Smithery now passes the selected `AMBARI_LOG_LEVEL` both as env and `--log-level
 
 - OpenWebUI will be available at the port specified in your `docker-compose.yml` (default: 3000 or as configured). You can access OpenWebUI at: [http://localhost:3000](http://localhost:3000)
 - The MCPO-Proxy will be accessible for API requests and cluster management, and its port is also specified in your `docker-compose.yml` (default: 8000 or as configured).
-- The list of MCP tool features provided by `src/mcp_ambari_api/ambari_api.py` can be found in the MCPO API Docs: [http://localhost:8000/ambar-api/docs](http://localhost:8000/ambar-api/docs)
+- The list of MCP tool features provided by `src/mcp_ambari_api/ambari_api.py` can be found in the MCPO API Docs: [http://localhost:8000/ambari-api/docs](http://localhost:8000/ambari-api/docs)
 ![Example: MCPO-Proxy](img/mcpo-proxy-api-docs.png)
 
 ### 4. Registering the Ambari-API MCP Tool in OpenWebUI
