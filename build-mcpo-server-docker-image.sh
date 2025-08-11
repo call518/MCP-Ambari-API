@@ -1,12 +1,12 @@
 #!/bin/bash
 set -o
 
-Dockerfile_PATH="./Dockerfile.for-OpenWebUI"
-IMAGE_NAME="call518/mcpo-proxy"
+Dockerfile_PATH="./Dockerfile.for-OpenWebUI-MCPO-Proxy"
+IMAGE_NAME="call518/mcpo-proxy-ambari-api"
 
 # CUSTOM_TAG="${1:-latest}"
 TAGs="
-1.0.2
+1.0.0
 latest
 "
 
