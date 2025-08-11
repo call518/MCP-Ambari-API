@@ -115,6 +115,8 @@ Using this Ambari API integration is very simple and straightforward. If you alr
 }
 ```
 
+> Local Demo Tip: Start by copying the template: `cp mcp-config.json.local mcp-config.json` and then edit the values for your environment.
+
 ## Self QuickStart (Demo): Setting Up MCP Tools Environment with Docker
 
   "command": "mcp-ambari-api",
