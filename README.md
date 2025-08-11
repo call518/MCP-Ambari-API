@@ -244,6 +244,14 @@ Public Smithery deployment available for quick trials (no local setup) if you ha
 
 ![Smithery Deployment Screenshot](img/ex-screenshot-smithery.ai.png)
 
+### Installing via Smithery
+
+To install Ambari API Integration Server for Claude Desktop automatically via [Smithery](https://smithery.ai/server/@call518/mcp-ambari-api):
+
+```bash
+npx -y @smithery/cli install @call518/mcp-ambari-api --client claude
+```
+
 ## License
 
 This project is licensed under the MIT License.
