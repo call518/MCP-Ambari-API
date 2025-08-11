@@ -138,11 +138,13 @@ If running inside the provided container image, the package is installed and exp
 Once your Ambari cluster is ready, check the following environment variables in your `mcp-config.json` file:
 
 ```json
+"PYTHONPATH": "/app/src",
 "AMBARI_HOST": "host.docker.internal",
 "AMBARI_PORT": "8080",
 "AMBARI_USER": "admin",
 "AMBARI_PASS": "admin",
-"AMBARI_CLUSTER_NAME": "TEST-AMBARI"
+"AMBARI_CLUSTER_NAME": "TEST-AMBARI",
+"AMBARI_LOG_LEVEL": "INFO"
 ```
 Make sure these values match your Ambari cluster setup.
 
