@@ -1,7 +1,7 @@
 services:
   open-webui:
     image: ghcr.io/open-webui/open-webui:main
-    container_name: open-webui
+    container_name: mcp-ambari-api-open-webui
     ports:
       - "3000:8080"
     environment:
@@ -15,7 +15,7 @@ services:
   # Optional: MCP Proxy Server for tools
   mcpo-proxy:
     image: call518/mcpo-proxy:latest
-    container_name: mcpo-proxy
+    container_name: mcp-ambari-api-mcpo-proxy
     ports:
       - "8000:8000"
     volumes:
