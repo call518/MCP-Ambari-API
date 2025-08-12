@@ -11,9 +11,49 @@ import logging
 import time
 from typing import Dict, Optional
 from base64 import b64encode
+from functools import wraps
 
 # Set up logging
 logger = logging.getLogger("AmbariService")
+
+# -----------------------------------------------------------------------------
+# Decorator for uniform tool call logging
+# -----------------------------------------------------------------------------
+def log_tool(func):
+    """Decorator for uniform tool call logging with timing and result categorization."""
+    tool_name = func.__name__
+
+    @wraps(func)
+    async def wrapper(*args, **kwargs):
+        start = time.monotonic()
+        # Avoid logging huge argument content; simple key=... pairs
+        try:
+            arg_preview = []
+            if kwargs:
+                for k, v in kwargs.items():
+                    if v is None:
+                        continue
+                    sv = str(v)
+                    if len(sv) > 120:
+                        sv = sv[:117] + '…'
+                    arg_preview.append(f"{k}={sv}")
+            logger.info(f"TOOL START {tool_name} {' '.join(arg_preview)}")
+            result = await func(*args, **kwargs)
+            duration_ms = (time.monotonic() - start) * 1000
+            # Categorize result
+            if isinstance(result, str) and result.startswith("Error:"):
+                logger.warning(f"TOOL ERROR_RETURN {tool_name} took={duration_ms:.1f}ms len={len(result)}")
+            elif isinstance(result, str) and result.startswith("[ERROR]"):
+                logger.warning(f"TOOL ERROR_RETURN {tool_name} took={duration_ms:.1f}ms len={len(result)}")
+            else:
+                logger.info(f"TOOL SUCCESS {tool_name} took={duration_ms:.1f}ms len={len(result) if hasattr(result,'__len__') else 'NA'}")
+            return result
+        except Exception:
+            duration_ms = (time.monotonic() - start) * 1000
+            logger.exception(f"TOOL EXCEPTION {tool_name} failed after {duration_ms:.1f}ms")
+            raise
+
+    return wrapper
 
 # Ambari API connection information environment variable settings
 AMBARI_HOST = os.environ.get("AMBARI_HOST", "localhost")
