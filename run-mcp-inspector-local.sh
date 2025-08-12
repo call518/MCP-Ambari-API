@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 
 # (NOTE) 로컬 개발 소스로 기동됨 (uv run 사용).
 

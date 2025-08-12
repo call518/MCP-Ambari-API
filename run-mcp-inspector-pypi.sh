@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 
 # (NOTE) 로컬 소스가 아닌 Pypi에 배포된  패키지로 기동됨.
 
