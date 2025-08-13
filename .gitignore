@@ -12,4 +12,7 @@ wheels/
 **/__pycache__/
 **/.pytest_cache/
 
+.vscode*
+.github/copilot-instructions.md
+
 mcp-config.json
