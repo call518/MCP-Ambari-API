@@ -36,7 +36,7 @@ mcp = FastMCP("ambari-api")
 # =============================================================================
 
 
-@mcp.tool()
+@mcp.tool(title="Dump Configurations")
 @log_tool
 async def dump_configurations(
     config_type: Optional[str] = None,
