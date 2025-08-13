@@ -1,3 +1,8 @@
+"""
+MCP tool definitions for Ambari REST API operations.
+
+- Ambari API Documents: https://github.com/apache/ambari/blob/trunk/ambari-server/docs/api/v1/index.md
+"""
 from typing import Dict, Optional, List
 import argparse
 from mcp.server.fastmcp import FastMCP

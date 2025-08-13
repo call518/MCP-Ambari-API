@@ -6,6 +6,8 @@
 
 Model Context Protocol (MCP) server for Apache Ambari API integration. This project provides tools for managing Hadoop clusters, including service operations, configuration management, status monitoring, and request tracking.
 
+- [Ambari API Documents](https://github.com/apache/ambari/blob/trunk/ambari-server/docs/api/v1/index.md)
+
 ## Features
 
 - Manage Hadoop services (start, stop, restart)
