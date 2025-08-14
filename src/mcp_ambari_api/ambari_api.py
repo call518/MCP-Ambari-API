@@ -1597,6 +1597,8 @@ async def get_alerts_history(
     # history mode only  
     from_timestamp: Optional[int] = None,
     to_timestamp: Optional[int] = None,
+    # NEW: provide current time context for LLM calculations
+    include_time_context: bool = False,
     limit: Optional[int] = None,
     page_size: int = 100,
     start_page: int = 0,
@@ -1616,6 +1618,7 @@ async def get_alerts_history(
     - History mode: Support filtering by time range with from_timestamp/to_timestamp
     - Support different output formats (detailed, summary, compact, groupedSummary for current)
     - History mode: Provide pagination support for large datasets
+    - Provide current time context for LLM natural language time calculations
 
     [Required Usage Scenarios]:
     - Current mode: When users request current alerts, active alerts, or alert status
@@ -1636,6 +1639,7 @@ async def get_alerts_history(
         maintenance_state: Filter by maintenance state (ON, OFF) - current mode only
         from_timestamp: Start timestamp in milliseconds (Unix epoch) - history mode only
         to_timestamp: End timestamp in milliseconds (Unix epoch) - history mode only
+        include_time_context: Add current time information for LLM natural language processing
         limit: Maximum number of alert entries to return
         page_size: Number of entries per page (default: 100) - history mode only
         start_page: Starting page number (default: 0) - history mode only
@@ -1649,6 +1653,36 @@ async def get_alerts_history(
     # Validate mode
     if mode not in ["current", "history"]:
         return f"Error: Invalid mode '{mode}'. Valid modes: current, history"
+    
+    # Prepare current time context if requested
+    current_time_context = ""
+    if include_time_context:
+        import datetime
+        current_time = datetime.datetime.now(datetime.timezone.utc)
+        current_time_ms = int(current_time.timestamp() * 1000)
+        
+        current_time_context = f"""
+CURRENT TIME CONTEXT FOR LLM CALCULATIONS:
+Current Date: {current_time.strftime('%Y-%m-%d')}
+Current Time: {current_time.strftime('%Y-%m-%d %H:%M:%S UTC')}
+Current Timestamp (ms): {current_time_ms}
+Current Year: {current_time.year}
+Current Month: {current_time.month}
+Current Day: {current_time.day}
+
+INSTRUCTIONS FOR LLM:
+- Calculate your desired time range based on the current time above
+- Convert your calculated datetime to Unix epoch milliseconds (multiply by 1000)
+- Use the calculated timestamps in from_timestamp and to_timestamp parameters
+
+EXAMPLE CALCULATIONS:
+- "yesterday": Calculate start and end of {(current_time - datetime.timedelta(days=1)).strftime('%Y-%m-%d')}
+- "last week": Calculate 7 days ago ({(current_time - datetime.timedelta(days=7)).strftime('%Y-%m-%d')}) to yesterday
+- "last year": Calculate start and end of {current_time.year - 1}
+- "10 years ago": Calculate around {current_time.year - 10}
+- Any natural language time expression can be calculated from the current time above
+
+"""
     
     try:
         # Build the endpoint URL based on mode and scope
@@ -1729,7 +1763,12 @@ async def get_alerts_history(
         
         if response_data is None or "error" in response_data:
             error_msg = response_data.get("error", "Unknown error") if response_data else "No response"
-            return f"Error: Unable to retrieve {mode} alerts - {error_msg}"
+            
+            # Include time context info even on errors if requested
+            if current_time_context.strip():
+                return f"{current_time_context.strip()}\n\nError: Unable to retrieve {mode} alerts - {error_msg}"
+            else:
+                return f"Error: Unable to retrieve {mode} alerts - {error_msg}"
         
         # Handle current mode special format cases
         if mode == "current" and format == "summary":
@@ -1850,6 +1889,11 @@ async def get_alerts_history(
         
         # Add mode-specific footer information
         result_lines = formatted_output.split('\n')
+        
+        # Add current time context if requested
+        if current_time_context.strip():
+            result_lines.insert(0, current_time_context.strip())
+            result_lines.insert(1, "")
         
         if mode == "current":
             # Add summary statistics
