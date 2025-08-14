@@ -9,6 +9,7 @@ import json
 import datetime
 import logging
 import time
+from datetime import timedelta
 from typing import Dict, Optional
 from base64 import b64encode
 from functools import wraps
@@ -72,6 +73,13 @@ def format_timestamp(timestamp, is_milliseconds=True):
         return "N/A"
     
     try:
+        # Handle string timestamps by converting to int first
+        if isinstance(timestamp, str):
+            try:
+                timestamp = int(timestamp)
+            except ValueError:
+                return f"{timestamp} (Invalid timestamp format)"
+        
         # If timestamp is in milliseconds, divide by 1000
         if is_milliseconds:
             dt = datetime.datetime.fromtimestamp(timestamp / 1000, tz=datetime.timezone.utc)
@@ -80,8 +88,41 @@ def format_timestamp(timestamp, is_milliseconds=True):
         
         formatted_time = dt.strftime('%Y-%m-%d %H:%M:%S UTC')
         return f"{timestamp} ({formatted_time})"
-    except (ValueError, OSError) as e:
+    except (ValueError, OSError, TypeError) as e:
         return f"{timestamp} (Invalid timestamp)"
+
+
+def safe_timestamp_compare(timestamp, threshold, operator='>='):
+    """
+    Safe timestamp comparison handling both str and int types.
+    
+    Args:
+        timestamp: The timestamp to compare (can be str or int)
+        threshold: The threshold to compare against (can be str or int)  
+        operator: Comparison operator ('>', '>=', '<', '<=')
+    
+    Returns:
+        bool: Result of comparison, False if conversion fails
+    """
+    try:
+        # Convert string to int if needed
+        if isinstance(timestamp, str):
+            timestamp = int(timestamp)
+        if isinstance(threshold, str):
+            threshold = int(threshold)
+            
+        if operator == '>':
+            return timestamp > threshold
+        elif operator == '>=':
+            return timestamp >= threshold
+        elif operator == '<':
+            return timestamp < threshold
+        elif operator == '<=':
+            return timestamp <= threshold
+        else:
+            return False
+    except (ValueError, TypeError):
+        return False
 
 
 async def make_ambari_request(endpoint: str, method: str = "GET", data: Optional[Dict] = None) -> Dict:
@@ -596,6 +637,10 @@ def format_alerts_compact(items, field_prefix, timestamp_field, mode, limit=None
     """Format alerts in compact mode - one line per alert."""
     result_lines = []
     
+    # Treat limit=0 as no limit
+    if limit == 0:
+        limit = None
+
     if mode == "current":
         result_lines.append("Current Alerts (compact):")
         result_lines.append("State     | Maint | Service     | Host                    | Definition")
@@ -651,6 +696,10 @@ def format_alerts_compact(items, field_prefix, timestamp_field, mode, limit=None
 def format_alerts_detailed(items, field_prefix, timestamp_field, mode, limit=None):
     """Format alerts in detailed mode - full information per alert."""
     result_lines = []
+    
+    # Treat limit=0 as no limit
+    if limit == 0:
+        limit = None
     
     if mode == "current":
         result_lines.append("Current Alerts (detailed):")
@@ -770,3 +819,47 @@ def format_single_alert_detailed(alert, count, mode, timestamp_field):
             result_lines.append(f"    Text: {text_display}")
     
     return result_lines
+
+
+def get_current_time_context() -> str:
+    """
+    Returns the current time context for accurate relative date calculations.
+    
+    This utility function provides current date and time information for reference 
+    in timestamp calculations.
+    
+    Returns:
+        Current date/time context with calculation examples (success: formatted context info, failure: error message)
+    """
+    try:
+        current_time = datetime.datetime.now(datetime.timezone.utc)
+        current_date_str = current_time.strftime('%Y-%m-%d')
+        current_time_str = current_time.strftime('%Y-%m-%d %H:%M:%S UTC')
+        current_time_ms = int(current_time.timestamp() * 1000)
+        
+        current_time_context = f"""
+CURRENT TIME CONTEXT FOR LLM CALCULATIONS:
+Current Date: {current_date_str}
+Current Time: {current_time_str}
+Current Timestamp (ms): {current_time_ms}
+Current Year: {current_time.year}
+Current Month: {current_time.month}
+Current Day: {current_time.day}
+
+INSTRUCTIONS FOR LLM:
+- Calculate your desired time range based on the current time above
+- Convert your calculated datetime to Unix epoch milliseconds (multiply by 1000)
+- Use the calculated timestamps in from_timestamp and to_timestamp parameters
+
+EXAMPLE CALCULATIONS:
+- "yesterday": Calculate start and end of {(current_time - timedelta(days=1)).strftime('%Y-%m-%d')}
+- "last week": Calculate 7 days ago ({(current_time - timedelta(days=7)).strftime('%Y-%m-%d')}) to yesterday
+- "last year": Calculate start and end of {current_time.year - 1}
+- "10 years ago": Calculate around {current_time.year - 10}
+- Any natural language time expression can be calculated from the current time above
+
+"""
+        return current_time_context.strip()
+        
+    except Exception as e:
+        return f"Error: Exception occurred while getting current time context - {str(e)}"

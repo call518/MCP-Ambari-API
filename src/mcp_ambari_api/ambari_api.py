@@ -16,7 +16,9 @@ from .functions import (
     make_ambari_request,
     AMBARI_CLUSTER_NAME,
     log_tool,
-    format_alerts_output
+    format_alerts_output,
+    get_current_time_context,
+    safe_timestamp_compare
 )
 
 # Set up logging (initial level from env; may be overridden by --log-level)
@@ -1498,93 +1500,6 @@ async def get_user(user_name: str) -> str:
 
 @mcp.tool()
 @log_tool
-async def get_current_time_context() -> str:
-    """
-    Returns the current time context for accurate relative date calculations.
-    
-    [Tool Role]: Provides current date and time information for reference in timestamp calculations
-    
-    [Core Functions]:
-    - Return current date and time in multiple formats
-    - Provide relative date calculation examples
-    - Enable accurate timestamp conversion for alert filtering
-    
-    [Required Usage Scenarios]:
-    - When users request alerts using relative time expressions ("last week", "yesterday", "past 3 days")
-    - Before making any API calls that require timestamp filtering
-    - When calculating Unix epoch milliseconds for date ranges
-    
-    Returns:
-        Current date/time context with calculation examples (success: formatted context info, failure: error message)
-    """
-    try:
-        from datetime import datetime, timedelta
-        import time
-        
-        current_time = datetime.now()
-        current_date_str = current_time.strftime('%Y-%m-%d')
-        current_time_str = current_time.strftime('%Y-%m-%d %H:%M:%S')
-        
-        # Calculate relative dates based on actual current time
-        yesterday = (current_time - timedelta(days=1)).strftime('%Y-%m-%d')
-        last_week_start = (current_time - timedelta(days=7)).strftime('%Y-%m-%d')
-        last_week_end = (current_time - timedelta(days=1)).strftime('%Y-%m-%d')
-        last_3_days_start = (current_time - timedelta(days=3)).strftime('%Y-%m-%d')
-        
-        # Calculate Unix epoch timestamps in milliseconds (Ambari format)
-        def to_epoch_ms(dt):
-            return int(dt.timestamp() * 1000)
-        
-        yesterday_start_ms = to_epoch_ms(datetime.combine(current_time.date() - timedelta(days=1), datetime.min.time()))
-        yesterday_end_ms = to_epoch_ms(datetime.combine(current_time.date() - timedelta(days=1), datetime.max.time().replace(microsecond=0)))
-        
-        last_week_start_ms = to_epoch_ms(datetime.combine(current_time.date() - timedelta(days=7), datetime.min.time()))
-        last_week_end_ms = to_epoch_ms(datetime.combine(current_time.date() - timedelta(days=1), datetime.max.time().replace(microsecond=0)))
-        
-        last_3_days_start_ms = to_epoch_ms(datetime.combine(current_time.date() - timedelta(days=3), datetime.min.time()))
-        current_time_ms = to_epoch_ms(current_time)
-        
-        result_lines = [
-            f"CURRENT TIME CONTEXT",
-            "=" * 40,
-            f"Current Date: {current_date_str}",
-            f"Current Time: {current_time_str}",
-            f"Current Epoch (ms): {current_time_ms}",
-            f"Reference: {current_time.strftime('%B %d, %Y')} ({current_date_str})",
-            "",
-            "RELATIVE DATE CALCULATIONS:",
-            "",
-            f"Yesterday:",
-            f"  Date: {yesterday}",
-            f"  Range: {yesterday_start_ms} to {yesterday_end_ms} (ms)",
-            "",
-            f"Last Week (7 days ago to yesterday):",
-            f"  Date Range: {last_week_start} to {last_week_end}",
-            f"  Timestamp Range: {last_week_start_ms} to {last_week_end_ms} (ms)",
-            "",
-            f"Last 3 Days:",
-            f"  Date Range: {last_3_days_start} to {current_date_str}",
-            f"  Timestamp Range: {last_3_days_start_ms} to {current_time_ms} (ms)",
-            "",
-            f"Today:",
-            f"  Date: {current_date_str}",
-            f"  Current Timestamp: {current_time_ms} (ms)",
-            "",
-            "USAGE EXAMPLES:",
-            f"- For 'yesterday' alerts: from_timestamp={yesterday_start_ms}, to_timestamp={yesterday_end_ms}",
-            f"- For 'last week' alerts: from_timestamp={last_week_start_ms}, to_timestamp={last_week_end_ms}",
-            f"- For 'last 3 days' alerts: from_timestamp={last_3_days_start_ms}, to_timestamp={current_time_ms}",
-            "",
-            "MESSAGE: Use these exact timestamp values for accurate alert history filtering."
-        ]
-        
-        return "\n".join(result_lines)
-        
-    except Exception as e:
-        return f"Error: Exception occurred while getting current time context - {str(e)}"
-
-@mcp.tool()
-@log_tool
 async def get_alerts_history(
     mode: str = "current",
     cluster_name: Optional[str] = None,
@@ -1654,35 +1569,56 @@ async def get_alerts_history(
     if mode not in ["current", "history"]:
         return f"Error: Invalid mode '{mode}'. Valid modes: current, history"
     
+    # Normalize and validate timestamp inputs early (accept str or int)
+    def _coerce_ts(name, val):
+        if val is None:
+            return None
+        try:
+            # Allow strings like "1754524800000" and ints
+            if isinstance(val, str):
+                val = val.strip()
+            return int(val)
+        except Exception:
+            raise ValueError(f"Invalid {name}: must be Unix epoch milliseconds as integer or numeric string")
+
+    try:
+        from_timestamp = _coerce_ts("from_timestamp", from_timestamp)
+        to_timestamp = _coerce_ts("to_timestamp", to_timestamp)
+    except ValueError as e:
+        return f"Error: {e}"
+
+    # Coerce numeric params that may arrive as strings from clients
+    def _coerce_int(name, val, allow_none=True):
+        if val is None and allow_none:
+            return None
+        try:
+            if isinstance(val, str):
+                val = val.strip()
+            return int(val)
+        except Exception:
+            raise ValueError(f"Invalid {name}: must be an integer")
+
+    try:
+        limit = _coerce_int("limit", limit, allow_none=True)
+        page_size = _coerce_int("page_size", page_size, allow_none=False)
+        start_page = _coerce_int("start_page", start_page, allow_none=False)
+    except ValueError as e:
+        return f"Error: {e}"
+
+    # Normalize limit=0 to None (meaning no limit)
+    if limit == 0:
+        limit = None
+
+    # Coerce include_time_context if string
+    if isinstance(include_time_context, str):
+        include_time_context = include_time_context.strip().lower() in ("1", "true", "yes", "y")
+    
     # Prepare current time context if requested
     current_time_context = ""
     if include_time_context:
-        import datetime
-        current_time = datetime.datetime.now(datetime.timezone.utc)
-        current_time_ms = int(current_time.timestamp() * 1000)
-        
-        current_time_context = f"""
-CURRENT TIME CONTEXT FOR LLM CALCULATIONS:
-Current Date: {current_time.strftime('%Y-%m-%d')}
-Current Time: {current_time.strftime('%Y-%m-%d %H:%M:%S UTC')}
-Current Timestamp (ms): {current_time_ms}
-Current Year: {current_time.year}
-Current Month: {current_time.month}
-Current Day: {current_time.day}
-
-INSTRUCTIONS FOR LLM:
-- Calculate your desired time range based on the current time above
-- Convert your calculated datetime to Unix epoch milliseconds (multiply by 1000)
-- Use the calculated timestamps in from_timestamp and to_timestamp parameters
-
-EXAMPLE CALCULATIONS:
-- "yesterday": Calculate start and end of {(current_time - datetime.timedelta(days=1)).strftime('%Y-%m-%d')}
-- "last week": Calculate 7 days ago ({(current_time - datetime.timedelta(days=7)).strftime('%Y-%m-%d')}) to yesterday
-- "last year": Calculate start and end of {current_time.year - 1}
-- "10 years ago": Calculate around {current_time.year - 10}
-- Any natural language time expression can be calculated from the current time above
-
-"""
+        current_time_context = get_current_time_context()
+        if current_time_context.startswith("Error:"):
+            return current_time_context  # Return error immediately
     
     try:
         # Build the endpoint URL based on mode and scope
@@ -1735,10 +1671,15 @@ EXAMPLE CALCULATIONS:
                 else:
                     return f"Error: Invalid maintenance state '{maintenance_state}'. Valid states: {', '.join(valid_maintenance)}"
             elif mode == "history":
-                if from_timestamp:
-                    predicates.append(f"AlertHistory/timestamp>={from_timestamp}")
-                if to_timestamp:
-                    predicates.append(f"AlertHistory/timestamp<={to_timestamp}")
+                # For history mode, try timestamp filtering with both int and string formats
+                if from_timestamp or to_timestamp:
+                    # First attempt: use integer timestamps (standard approach)
+                    if from_timestamp:
+                        predicates.append(f"AlertHistory/timestamp>={from_timestamp}")
+                    if to_timestamp:
+                        predicates.append(f"AlertHistory/timestamp<={to_timestamp}")
+                    
+                    # Note: If this fails due to type mismatch, we'll handle it in the fallback logic
             
             # Combine predicates
             if predicates:
@@ -1760,15 +1701,74 @@ EXAMPLE CALCULATIONS:
             endpoint += "?" + "&".join(query_params)
         
         response_data = await make_ambari_request(endpoint)
+        client_side_filter_needed = False
         
         if response_data is None or "error" in response_data:
             error_msg = response_data.get("error", "Unknown error") if response_data else "No response"
-            
+            # For history mode with timestamp filters, always retry without timestamp predicates
+            if mode == "history" and (from_timestamp or to_timestamp):
+                logger.warning("Timestamp filtering failed, retrying without timestamp filters")
+                # Rebuild query without timestamp predicates
+                fallback_query_params = []
+                fallback_predicates = []
+
+                # Add basic filters
+                fallback_query_params.append(f"fields={field_prefix}/*")
+                # Re-add non-timestamp filters
+                if state_filter:
+                    state_upper = state_filter.upper()
+                    if state_upper in ["CRITICAL", "WARNING", "OK", "UNKNOWN"]:
+                        fallback_predicates.append(f"{field_prefix}/state={state_upper}")
+                if definition_name:
+                    fallback_predicates.append(f"{field_prefix}/definition_name={definition_name}")
+                # Combine fallback predicates
+                if fallback_predicates:
+                    fallback_predicate_string = "(" + ")&(".join(fallback_predicates) + ")"
+                    fallback_query_params.append(fallback_predicate_string)
+                # Add sorting and pagination
+                fallback_query_params.append("sortBy=AlertHistory/timestamp.desc")
+                fallback_query_params.append(f"from={start_page * page_size}")
+                if page_size > 0:
+                    fallback_query_params.append(f"page_size={page_size}")
+                # Build fallback endpoint
+                fallback_endpoint = endpoint.split('?')[0] + "?" + "&".join(fallback_query_params)
+                # Try the fallback request
+                response_data = await make_ambari_request(fallback_endpoint)
+                if response_data is None or "error" in response_data:
+                    fallback_error = response_data.get("error", "Unknown error") if response_data else "No response"
+                    error_msg = f"Primary request failed (timestamp filter issue), fallback also failed: {fallback_error}"
+                else:
+                    # Successful fallback - we'll need to filter client-side
+                    client_side_filter_needed = True
+        
+        # Final error check after all attempts
+        if response_data is None or "error" in response_data:
+            final_error = response_data.get("error", "Unknown error") if response_data else "No response"
             # Include time context info even on errors if requested
             if current_time_context.strip():
-                return f"{current_time_context.strip()}\n\nError: Unable to retrieve {mode} alerts - {error_msg}"
+                return f"{current_time_context.strip()}\n\nError: Unable to retrieve {mode} alerts - {final_error}"
             else:
-                return f"Error: Unable to retrieve {mode} alerts - {error_msg}"
+                return f"Error: Unable to retrieve {mode} alerts - {final_error}"        # Apply client-side filtering if needed (when server-side timestamp filtering failed)
+        if mode == "history" and client_side_filter_needed and (from_timestamp or to_timestamp):
+            logger.info("Applying client-side timestamp filtering due to server-side type mismatch")
+            items = response_data.get("items", [])
+            filtered_items = []
+            
+            for item in items:
+                alert = item.get("AlertHistory", {})
+                timestamp = alert.get("timestamp", 0)
+                
+                # Apply timestamp filters using safe comparison
+                if from_timestamp and not safe_timestamp_compare(timestamp, from_timestamp, '>='):
+                    continue
+                if to_timestamp and not safe_timestamp_compare(timestamp, to_timestamp, '<='):
+                    continue
+                    
+                filtered_items.append(item)
+            
+            # Replace items with filtered items
+            response_data["items"] = filtered_items
+            logger.info(f"Client-side filtering: {len(items)} -> {len(filtered_items)} items")
         
         # Handle current mode special format cases
         if mode == "current" and format == "summary":
@@ -1859,7 +1859,12 @@ EXAMPLE CALCULATIONS:
         
         # Add pagination info for history mode
         if mode == "history":
-            total_count = response_data.get("itemTotal", len(items))
+            # Coerce total_count to int to avoid comparison errors between str and int
+            raw_total = response_data.get("itemTotal", len(items))
+            try:
+                total_count = int(raw_total)
+            except (TypeError, ValueError):
+                total_count = len(items)
             format_params['total_count'] = total_count
             format_params['page_size'] = page_size
             format_params['start_page'] = start_page
@@ -1909,13 +1914,18 @@ EXAMPLE CALCULATIONS:
                 if count > 0:
                     result_lines.append(f"  {state}: {count}")
         
-        elif mode == "history" and format_params.get('total_count', 0) > len(items):
-            # Add pagination information
-            total_pages = (format_params['total_count'] + page_size - 1) // page_size
-            result_lines.extend([
-                "",
-                f"Pagination: Page {start_page + 1} of {total_pages} (total: {format_params['total_count']} entries)",
-            ])
+        elif mode == "history":
+            # Safely add pagination information if total_count > number of items
+            try:
+                total_count = int(format_params.get('total_count', 0))
+            except (TypeError, ValueError):
+                total_count = 0
+            if total_count > len(items):
+                total_pages = (total_count + page_size - 1) // page_size
+                result_lines.extend([
+                    "",
+                    f"Pagination: Page {start_page + 1} of {total_pages} (total: {total_count} entries)",
+                ])
         
         result_lines.append(f"\nAPI Endpoint: {format_params.get('api_href', 'Not available')}")
         

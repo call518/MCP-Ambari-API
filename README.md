@@ -104,7 +104,7 @@ Retrieve dynamically via MCP tool:
 - `get_prompt_template("5")` – section 5 (formatting guidelines)
 - `get_prompt_template(mode="headings")` – list all section headings
 
-Policy: Only English is stored; LLM는 사용자 질의 언어와 무관하게 영어 지침을 내부 추론용으로 사용하고, 사용자 응답은 필요 시 다국어로 생성한다.
+Policy: Only English is stored; the LLM uses the English instructions for internal reasoning regardless of the user's language, and user-facing responses may be generated in any language as needed.
 
 ### Configuration Tool Migration Notes
 
