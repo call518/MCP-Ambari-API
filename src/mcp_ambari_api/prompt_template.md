@@ -1,4 +1,7 @@
-# MCP Ambari API Prompt Template (English - Default)
+# MCP Ambari API Prompt Template (English - Defau7. Explicit start / stop / restart + service name → corresponding single-service tool.
+8. Phrase includes "all services" + start/stop/restart → bulk operation (warn!).
+9. Mentions users / user list / access → list_users for all users, or get_user(username) for specific user details.
+10. Ambiguous reference ("restart it") → if no prior unambiguous service, ask (or clarify) before calling.
 
 Canonical English prompt template for the Ambari MCP server. Use this file as the primary system/developer prompt to guide tool selection and safety behavior.
 
@@ -32,6 +35,8 @@ Every tool call triggers a real Ambari REST API request. Call tools ONLY when ne
 | Host list | list_hosts | Host names | |
 | Host detail(s) | get_host_details(host_name?) | HW / metrics / components with states | No host → all hosts |
 | Config introspection (single or bulk) | dump_configurations | Types, keys, values | Use summarize=True for large dumps |
+| User list | list_users | All users with names & links | "users" / "user list" / "who has access" |
+| User details | get_user(user_name) | Profile, permissions, auth sources | Specific user information |
 
 ---
 ## 4. Decision Flow
@@ -83,6 +88,12 @@ Every tool call triggers a real Ambari REST API request. Call tools ONLY when ne
 
 ### G. User: "Show yarn.nodemanager.resource.memory-mb from yarn-site.xml"
 → Call: dump_configurations(config_type="yarn-site", filter="yarn.nodemanager.resource.memory-mb") then extract value
+
+### H. User: "List all users" or "Who has access to the cluster?"
+→ Call: list_users
+
+### I. User: "Show details for user admin" or "Get user info for jdoe"
+→ Call: get_user("admin") or get_user("jdoe")
 
 ---
 ## 7. Out-of-Scope Handling

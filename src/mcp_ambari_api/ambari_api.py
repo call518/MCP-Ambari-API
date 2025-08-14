@@ -1360,6 +1360,142 @@ async def get_host_details(host_name: Optional[str] = None) -> str:
         return f"Error: Exception occurred while retrieving host details - {str(e)}"
 
 @mcp.tool()
+@log_tool
+async def list_users() -> str:
+    """List all users in the Ambari system.
+    
+    Returns a formatted list of all users with their basic information.
+    """
+    try:
+        response = await make_ambari_request("/users")
+        
+        if "error" in response:
+            return f"Error: Failed to retrieve users - {response['error']}"
+        
+        if "items" not in response or not response["items"]:
+            return "No users found in the system."
+        
+        result_lines = []
+        result_lines.append("=== AMBARI USERS ===\n")
+        
+        # Header
+        result_lines.append(f"{'User Name':<20} {'HREF':<50}")
+        result_lines.append("-" * 70)
+        
+        for user in response["items"]:
+            user_info = user.get("Users", {})
+            user_name = user_info.get("user_name", "N/A")
+            href = user.get("href", "N/A")
+            
+            result_lines.append(f"{user_name:<20} {href:<50}")
+        
+        result_lines.append("\n" + "=" * 70)
+        result_lines.append(f"Total Users: {len(response['items'])}")
+        
+        return "\n".join(result_lines)
+        
+    except Exception as e:
+        return f"Error: Exception occurred while retrieving users - {str(e)}"
+
+@mcp.tool()
+@log_tool
+async def get_user(user_name: str) -> str:
+    """Get detailed information about a specific user.
+    
+    Args:
+        user_name: The username to retrieve details for
+        
+    Returns:
+        Detailed user information including profile, permissions, and authentication sources
+    """
+    try:
+        if not user_name:
+            return "Error: user_name parameter is required"
+        
+        response = await make_ambari_request(f"/users/{user_name}")
+        
+        if "error" in response:
+            return f"Error: Failed to retrieve user '{user_name}' - {response['error']}"
+        
+        if "Users" not in response:
+            return f"Error: Invalid response format for user '{user_name}'"
+        
+        user_info = response["Users"]
+        result_lines = []
+        result_lines.append(f"=== USER DETAILS: {user_name} ===\n")
+        
+        # Basic Information
+        result_lines.append("BASIC INFORMATION:")
+        result_lines.append(f"  User ID: {user_info.get('user_id', 'N/A')}")
+        result_lines.append(f"  User Name: {user_info.get('user_name', 'N/A')}")
+        result_lines.append(f"  Local User Name: {user_info.get('local_user_name', 'N/A')}")
+        result_lines.append(f"  Display Name: {user_info.get('display_name', 'N/A')}")
+        result_lines.append(f"  User Type: {user_info.get('user_type', 'N/A')}")
+        result_lines.append("")
+        
+        # Status Information
+        result_lines.append("STATUS:")
+        result_lines.append(f"  Admin: {user_info.get('admin', False)}")
+        result_lines.append(f"  Active: {user_info.get('active', 'N/A')}")
+        result_lines.append(f"  LDAP User: {user_info.get('ldap_user', False)}")
+        result_lines.append(f"  Consecutive Failures: {user_info.get('consecutive_failures', 'N/A')}")
+        result_lines.append("")
+        
+        # Timestamps
+        created_timestamp = user_info.get('created')
+        if created_timestamp:
+            result_lines.append("TIMESTAMPS:")
+            result_lines.append(f"  Created: {format_timestamp(created_timestamp)}")
+            result_lines.append("")
+        
+        # Groups
+        groups = user_info.get('groups', [])
+        result_lines.append("GROUPS:")
+        if groups:
+            for group in groups:
+                result_lines.append(f"  - {group}")
+        else:
+            result_lines.append("  (No groups assigned)")
+        result_lines.append("")
+        
+        # Authentication Sources
+        sources = response.get('sources', [])
+        result_lines.append("AUTHENTICATION SOURCES:")
+        if sources:
+            for source in sources:
+                source_info = source.get('AuthenticationSourceInfo', {})
+                result_lines.append(f"  Source ID: {source_info.get('source_id', 'N/A')}")
+                result_lines.append(f"  HREF: {source.get('href', 'N/A')}")
+        else:
+            result_lines.append("  (No authentication sources)")
+        result_lines.append("")
+        
+        # Privileges
+        privileges = response.get('privileges', [])
+        result_lines.append("PRIVILEGES:")
+        if privileges:
+            for privilege in privileges:
+                result_lines.append(f"  - {privilege}")
+        else:
+            result_lines.append("  (No privileges assigned)")
+        result_lines.append("")
+        
+        # Widget Layouts
+        widget_layouts = response.get('widget_layouts', [])
+        result_lines.append("WIDGET LAYOUTS:")
+        if widget_layouts:
+            result_lines.append(f"  Count: {len(widget_layouts)}")
+        else:
+            result_lines.append("  (No widget layouts)")
+        
+        result_lines.append("\n" + "=" * 50)
+        
+        return "\n".join(result_lines)
+        
+    except Exception as e:
+        return f"Error: Exception occurred while retrieving user '{user_name}' - {str(e)}"
+
+@mcp.tool()
 async def get_prompt_template(section: Optional[str] = None, mode: Optional[str] = None) -> str:
     """Return the canonical English prompt template (optionally a specific section).
 
