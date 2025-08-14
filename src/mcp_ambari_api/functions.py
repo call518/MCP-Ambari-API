@@ -631,7 +631,8 @@ def format_alerts_compact(items, field_prefix, timestamp_field, mode, limit=None
             host = alert.get("host_name", "N/A")
             definition = alert.get("definition_name", "Unknown")
             
-            time_str = format_timestamp(timestamp).split(" (")[1].rstrip(")")  # Extract readable part
+            time_formatted = format_timestamp(timestamp)
+            time_str = time_formatted.split(" (")[1].rstrip(")") if " (" in time_formatted else time_formatted
             state_padded = state.ljust(9)
             service_padded = service[:11].ljust(11)
             host_padded = host[:23].ljust(23)

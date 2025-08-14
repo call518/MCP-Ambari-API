@@ -1498,6 +1498,93 @@ async def get_user(user_name: str) -> str:
 
 @mcp.tool()
 @log_tool
+async def get_current_time_context() -> str:
+    """
+    Returns the current time context for accurate relative date calculations.
+    
+    [Tool Role]: Provides current date and time information for reference in timestamp calculations
+    
+    [Core Functions]:
+    - Return current date and time in multiple formats
+    - Provide relative date calculation examples
+    - Enable accurate timestamp conversion for alert filtering
+    
+    [Required Usage Scenarios]:
+    - When users request alerts using relative time expressions ("last week", "yesterday", "past 3 days")
+    - Before making any API calls that require timestamp filtering
+    - When calculating Unix epoch milliseconds for date ranges
+    
+    Returns:
+        Current date/time context with calculation examples (success: formatted context info, failure: error message)
+    """
+    try:
+        from datetime import datetime, timedelta
+        import time
+        
+        current_time = datetime.now()
+        current_date_str = current_time.strftime('%Y-%m-%d')
+        current_time_str = current_time.strftime('%Y-%m-%d %H:%M:%S')
+        
+        # Calculate relative dates based on actual current time
+        yesterday = (current_time - timedelta(days=1)).strftime('%Y-%m-%d')
+        last_week_start = (current_time - timedelta(days=7)).strftime('%Y-%m-%d')
+        last_week_end = (current_time - timedelta(days=1)).strftime('%Y-%m-%d')
+        last_3_days_start = (current_time - timedelta(days=3)).strftime('%Y-%m-%d')
+        
+        # Calculate Unix epoch timestamps in milliseconds (Ambari format)
+        def to_epoch_ms(dt):
+            return int(dt.timestamp() * 1000)
+        
+        yesterday_start_ms = to_epoch_ms(datetime.combine(current_time.date() - timedelta(days=1), datetime.min.time()))
+        yesterday_end_ms = to_epoch_ms(datetime.combine(current_time.date() - timedelta(days=1), datetime.max.time().replace(microsecond=0)))
+        
+        last_week_start_ms = to_epoch_ms(datetime.combine(current_time.date() - timedelta(days=7), datetime.min.time()))
+        last_week_end_ms = to_epoch_ms(datetime.combine(current_time.date() - timedelta(days=1), datetime.max.time().replace(microsecond=0)))
+        
+        last_3_days_start_ms = to_epoch_ms(datetime.combine(current_time.date() - timedelta(days=3), datetime.min.time()))
+        current_time_ms = to_epoch_ms(current_time)
+        
+        result_lines = [
+            f"CURRENT TIME CONTEXT",
+            "=" * 40,
+            f"Current Date: {current_date_str}",
+            f"Current Time: {current_time_str}",
+            f"Current Epoch (ms): {current_time_ms}",
+            f"Reference: {current_time.strftime('%B %d, %Y')} ({current_date_str})",
+            "",
+            "RELATIVE DATE CALCULATIONS:",
+            "",
+            f"Yesterday:",
+            f"  Date: {yesterday}",
+            f"  Range: {yesterday_start_ms} to {yesterday_end_ms} (ms)",
+            "",
+            f"Last Week (7 days ago to yesterday):",
+            f"  Date Range: {last_week_start} to {last_week_end}",
+            f"  Timestamp Range: {last_week_start_ms} to {last_week_end_ms} (ms)",
+            "",
+            f"Last 3 Days:",
+            f"  Date Range: {last_3_days_start} to {current_date_str}",
+            f"  Timestamp Range: {last_3_days_start_ms} to {current_time_ms} (ms)",
+            "",
+            f"Today:",
+            f"  Date: {current_date_str}",
+            f"  Current Timestamp: {current_time_ms} (ms)",
+            "",
+            "USAGE EXAMPLES:",
+            f"- For 'yesterday' alerts: from_timestamp={yesterday_start_ms}, to_timestamp={yesterday_end_ms}",
+            f"- For 'last week' alerts: from_timestamp={last_week_start_ms}, to_timestamp={last_week_end_ms}",
+            f"- For 'last 3 days' alerts: from_timestamp={last_3_days_start_ms}, to_timestamp={current_time_ms}",
+            "",
+            "MESSAGE: Use these exact timestamp values for accurate alert history filtering."
+        ]
+        
+        return "\n".join(result_lines)
+        
+    except Exception as e:
+        return f"Error: Exception occurred while getting current time context - {str(e)}"
+
+@mcp.tool()
+@log_tool
 async def get_alerts_history(
     mode: str = "current",
     cluster_name: Optional[str] = None,
