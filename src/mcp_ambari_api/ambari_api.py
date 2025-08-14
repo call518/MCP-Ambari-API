@@ -1496,6 +1496,658 @@ async def get_user(user_name: str) -> str:
         return f"Error: Exception occurred while retrieving user '{user_name}' - {str(e)}"
 
 @mcp.tool()
+@log_tool
+async def get_alert_history(
+    cluster_name: Optional[str] = None,
+    service_name: Optional[str] = None,
+    host_name: Optional[str] = None,
+    state_filter: Optional[str] = None,
+    definition_name: Optional[str] = None,
+    from_timestamp: Optional[int] = None,
+    to_timestamp: Optional[int] = None,
+    limit: Optional[int] = None,
+    page_size: int = 100,
+    start_page: int = 0,
+    format: str = "detailed"
+) -> str:
+    """
+    Retrieve alert history from Ambari cluster.
+
+    [Tool Role]: Dedicated tool for retrieving historical alert events from Ambari cluster
+    
+    [Core Functions]:
+    - Retrieve alert history for entire cluster, specific service, or specific host
+    - Support filtering by alert state (CRITICAL, WARNING, OK, UNKNOWN)
+    - Support filtering by definition name or time range
+    - Provide pagination support for large datasets
+    - Support different output formats (detailed, summary, compact)
+
+    [Required Usage Scenarios]:
+    - When users request alert history, past alerts, or historical alert data
+    - When monitoring alert trends or analyzing alert patterns
+    - When investigating past alert incidents or troubleshooting
+    - When users mention alert events, alert timeline, or alert logs
+
+    Args:
+        cluster_name: Name of cluster (uses default if not specified)
+        service_name: Filter by specific service name (e.g., HDFS, YARN)
+        host_name: Filter by specific host name
+        state_filter: Filter by alert state (CRITICAL, WARNING, OK, UNKNOWN)
+        definition_name: Filter by alert definition name
+        from_timestamp: Start timestamp in milliseconds (Unix epoch)
+        to_timestamp: End timestamp in milliseconds (Unix epoch)
+        limit: Maximum number of alert history entries to return
+        page_size: Number of entries per page (default: 100)
+        start_page: Starting page number (default: 0)
+        format: Output format - 'detailed', 'summary', or 'compact'
+
+    Returns:
+        Alert history information (success: formatted alert history, failure: English error message)
+    """
+    target_cluster = cluster_name or AMBARI_CLUSTER_NAME
+    
+    try:
+        # Build the endpoint URL based on scope
+        if host_name:
+            # Host-specific alert history
+            endpoint = f"/clusters/{target_cluster}/hosts/{host_name}/alert_history"
+        elif service_name:
+            # Service-specific alert history
+            endpoint = f"/clusters/{target_cluster}/services/{service_name}/alert_history"
+        else:
+            # Cluster-wide alert history
+            endpoint = f"/clusters/{target_cluster}/alert_history"
+        
+        # Build query parameters
+        query_params = []
+        
+        # Add field specification for full data
+        query_params.append("fields=AlertHistory/*")
+        
+        # Build predicate filters
+        predicates = []
+        
+        if state_filter:
+            state_upper = state_filter.upper()
+            valid_states = ["CRITICAL", "WARNING", "OK", "UNKNOWN"]
+            if state_upper in valid_states:
+                predicates.append(f"AlertHistory/state={state_upper}")
+            else:
+                return f"Error: Invalid state filter '{state_filter}'. Valid states: {', '.join(valid_states)}"
+        
+        if definition_name:
+            predicates.append(f"AlertHistory/definition_name={definition_name}")
+            
+        if from_timestamp:
+            predicates.append(f"AlertHistory/timestamp>={from_timestamp}")
+            
+        if to_timestamp:
+            predicates.append(f"AlertHistory/timestamp<={to_timestamp}")
+        
+        # Combine predicates
+        if predicates:
+            predicate_string = "(" + ")&(".join(predicates) + ")"
+            query_params.append(predicate_string)
+        
+        # Add pagination
+        query_params.append(f"from={start_page * page_size}")
+        if page_size > 0:
+            query_params.append(f"page_size={page_size}")
+        
+        # Add sorting (most recent first)
+        query_params.append("sortBy=AlertHistory/timestamp.desc")
+        
+        # Construct full URL
+        if query_params:
+            endpoint += "?" + "&".join(query_params)
+        
+        response_data = await make_ambari_request(endpoint)
+        
+        if response_data is None or "error" in response_data:
+            error_msg = response_data.get("error", "Unknown error") if response_data else "No response"
+            return f"Error: Unable to retrieve alert history - {error_msg}"
+        
+        items = response_data.get("items", [])
+        
+        if not items:
+            scope_desc = f"host '{host_name}'" if host_name else f"service '{service_name}'" if service_name else f"cluster '{target_cluster}'"
+            filter_desc = ""
+            if state_filter or definition_name or from_timestamp or to_timestamp:
+                filters = []
+                if state_filter:
+                    filters.append(f"state={state_filter}")
+                if definition_name:
+                    filters.append(f"definition={definition_name}")
+                if from_timestamp or to_timestamp:
+                    time_filter = "time range"
+                    if from_timestamp and to_timestamp:
+                        time_filter = f"time range {from_timestamp}-{to_timestamp}"
+                    elif from_timestamp:
+                        time_filter = f"after {from_timestamp}"
+                    elif to_timestamp:
+                        time_filter = f"before {to_timestamp}"
+                    filters.append(time_filter)
+                filter_desc = f" with filters: {', '.join(filters)}"
+            return f"No alert history found for {scope_desc}{filter_desc}"
+        
+        result_lines = []
+        
+        # Header information
+        total_count = response_data.get("itemTotal", len(items))
+        scope_desc = f"host '{host_name}'" if host_name else f"service '{service_name}'" if service_name else f"cluster '{target_cluster}'"
+        
+        result_lines.extend([
+            f"Alert History for {scope_desc}",
+            "=" * 60,
+            f"Total matching entries: {total_count}",
+            f"Showing {len(items)} entries (page {start_page + 1}, page size: {page_size})"
+        ])
+        
+        # Add filter information if any
+        if state_filter or definition_name or from_timestamp or to_timestamp:
+            filter_info = []
+            if state_filter:
+                filter_info.append(f"State: {state_filter}")
+            if definition_name:
+                filter_info.append(f"Definition: {definition_name}")
+            if from_timestamp:
+                filter_info.append(f"From: {format_timestamp(from_timestamp)}")
+            if to_timestamp:
+                filter_info.append(f"To: {format_timestamp(to_timestamp)}")
+            result_lines.append(f"Filters: {', '.join(filter_info)}")
+        
+        result_lines.append("")
+        
+        if format == "summary":
+            # Summary format - group by state and definition
+            state_counts = {}
+            definition_counts = {}
+            service_counts = {}
+            
+            for item in items:
+                alert_history = item.get("AlertHistory", {})
+                state = alert_history.get("state", "UNKNOWN")
+                definition = alert_history.get("definition_name", "Unknown")
+                service = alert_history.get("service_name", "Unknown")
+                
+                state_counts[state] = state_counts.get(state, 0) + 1
+                definition_counts[definition] = definition_counts.get(definition, 0) + 1
+                service_counts[service] = service_counts.get(service, 0) + 1
+            
+            result_lines.append("Summary by State:")
+            for state in ["CRITICAL", "WARNING", "OK", "UNKNOWN"]:
+                count = state_counts.get(state, 0)
+                if count > 0:
+                    result_lines.append(f"  {state}: {count}")
+            
+            result_lines.append("\nTop Alert Definitions:")
+            sorted_definitions = sorted(definition_counts.items(), key=lambda x: x[1], reverse=True)[:10]
+            for definition, count in sorted_definitions:
+                result_lines.append(f"  {definition}: {count}")
+            
+            if not host_name and not service_name:  # Only show service breakdown for cluster-wide queries
+                result_lines.append("\nTop Services:")
+                sorted_services = sorted(service_counts.items(), key=lambda x: x[1], reverse=True)[:10]
+                for service, count in sorted_services:
+                    result_lines.append(f"  {service}: {count}")
+        
+        elif format == "compact":
+            # Compact format - one line per alert
+            result_lines.append("Alert History Entries (compact):")
+            result_lines.append("Timestamp                | State     | Service     | Host                    | Definition")
+            result_lines.append("-" * 100)
+            
+            for item in items:
+                alert_history = item.get("AlertHistory", {})
+                timestamp = alert_history.get("timestamp", 0)
+                state = alert_history.get("state", "UNKNOWN")
+                service = alert_history.get("service_name", "N/A")
+                host = alert_history.get("host_name", "N/A")
+                definition = alert_history.get("definition_name", "Unknown")
+                
+                time_str = format_timestamp(timestamp).split(" (")[1].rstrip(")")  # Extract just the readable part
+                state_padded = state.ljust(9)
+                service_padded = service[:11].ljust(11)
+                host_padded = host[:23].ljust(23)
+                definition_short = definition[:40] + "..." if len(definition) > 40 else definition
+                
+                result_lines.append(f"{time_str} | {state_padded} | {service_padded} | {host_padded} | {definition_short}")
+                
+                if limit and len(result_lines) - 7 >= limit:  # Account for header lines
+                    result_lines.append(f"... (showing first {limit} entries)")
+                    break
+        
+        else:  # detailed format (default)
+            result_lines.append("Alert History Entries (detailed):")
+            result_lines.append("")
+            
+            count = 0
+            for item in items:
+                alert_history = item.get("AlertHistory", {})
+                
+                # Basic information
+                alert_id = alert_history.get("id", "Unknown")
+                timestamp = alert_history.get("timestamp", 0)
+                state = alert_history.get("state", "UNKNOWN")
+                definition_name = alert_history.get("definition_name", "Unknown")
+                definition_id = alert_history.get("definition_id", "Unknown")
+                service_name = alert_history.get("service_name", "Unknown")
+                component_name = alert_history.get("component_name", "Unknown")
+                host_name_alert = alert_history.get("host_name", "N/A")
+                label = alert_history.get("label", "No label")
+                text = alert_history.get("text", "No description")
+                instance = alert_history.get("instance", None)
+                
+                count += 1
+                result_lines.extend([
+                    f"[{count}] Alert ID: {alert_id}",
+                    f"    Timestamp: {format_timestamp(timestamp)}",
+                    f"    State: {state}",
+                    f"    Service: {service_name}",
+                    f"    Component: {component_name}",
+                    f"    Host: {host_name_alert}",
+                    f"    Definition: {definition_name} (ID: {definition_id})",
+                    f"    Label: {label}",
+                ])
+                
+                if instance:
+                    result_lines.append(f"    Instance: {instance}")
+                
+                # Format alert text (handle multi-line text)
+                if text:
+                    if "\n" in text:
+                        result_lines.append("    Text:")
+                        for line in text.split("\n"):
+                            result_lines.append(f"      {line}")
+                    else:
+                        text_display = text if len(text) <= 100 else text[:97] + "..."
+                        result_lines.append(f"    Text: {text_display}")
+                
+                # API reference
+                api_href = item.get("href", "")
+                if api_href:
+                    result_lines.append(f"    API: {api_href}")
+                
+                result_lines.append("")
+                
+                if limit and count >= limit:
+                    result_lines.append(f"... (showing first {limit} entries)")
+                    break
+        
+        # Add pagination information
+        if total_count > len(items):
+            total_pages = (total_count + page_size - 1) // page_size
+            result_lines.extend([
+                "",
+                f"Pagination: Page {start_page + 1} of {total_pages} (total: {total_count} entries)",
+                f"API Endpoint: {response_data.get('href', 'Not available')}"
+            ])
+        
+        return "\n".join(result_lines)
+        
+    except Exception as e:
+        return f"Error: Exception occurred while retrieving alert history - {str(e)}"
+
+@mcp.tool()
+@log_tool
+async def get_current_alerts(
+    cluster_name: Optional[str] = None,
+    service_name: Optional[str] = None,
+    host_name: Optional[str] = None,
+    state_filter: Optional[str] = None,
+    definition_name: Optional[str] = None,
+    maintenance_state: Optional[str] = None,
+    format: str = "detailed"
+) -> str:
+    """
+    Retrieve current alerts from Ambari cluster.
+
+    [Tool Role]: Dedicated tool for retrieving current/active alert status from Ambari cluster
+    
+    [Core Functions]:
+    - Retrieve current alerts for entire cluster, specific service, or specific host
+    - Support filtering by alert state (CRITICAL, WARNING, OK, UNKNOWN)
+    - Support filtering by maintenance state (ON, OFF)
+    - Support filtering by definition name
+    - Support different output formats (detailed, summary, compact, groupedSummary)
+
+    [Required Usage Scenarios]:
+    - When users request current alerts, active alerts, or alert status
+    - When monitoring immediate cluster health
+    - When investigating current issues or troubleshooting active problems
+    - When users mention alert status, current problems, or cluster health
+
+    Args:
+        cluster_name: Name of cluster (uses default if not specified)
+        service_name: Filter by specific service name (e.g., HDFS, YARN)
+        host_name: Filter by specific host name
+        state_filter: Filter by alert state (CRITICAL, WARNING, OK, UNKNOWN)
+        definition_name: Filter by alert definition name
+        maintenance_state: Filter by maintenance state (ON, OFF)
+        format: Output format - 'detailed', 'summary', 'compact', or 'groupedSummary'
+
+    Returns:
+        Current alerts information (success: formatted alerts, failure: English error message)
+    """
+    target_cluster = cluster_name or AMBARI_CLUSTER_NAME
+    
+    try:
+        # Build the endpoint URL based on scope
+        if host_name:
+            # Host-specific alerts
+            endpoint = f"/clusters/{target_cluster}/hosts/{host_name}/alerts"
+        elif service_name:
+            # Service-specific alerts
+            endpoint = f"/clusters/{target_cluster}/services/{service_name}/alerts"
+        else:
+            # Cluster-wide alerts
+            endpoint = f"/clusters/{target_cluster}/alerts"
+        
+        # Build query parameters
+        query_params = []
+        
+        # Handle special format cases first
+        if format == "summary":
+            query_params.append("format=summary")
+        elif format == "groupedSummary":
+            query_params.append("format=groupedSummary")
+        else:
+            # Add field specification for full data
+            query_params.append("fields=Alert/*")
+            
+            # Build predicate filters
+            predicates = []
+            
+            if state_filter:
+                state_upper = state_filter.upper()
+                valid_states = ["CRITICAL", "WARNING", "OK", "UNKNOWN"]
+                if state_upper in valid_states:
+                    predicates.append(f"Alert/state={state_upper}")
+                else:
+                    return f"Error: Invalid state filter '{state_filter}'. Valid states: {', '.join(valid_states)}"
+            
+            if definition_name:
+                predicates.append(f"Alert/definition_name={definition_name}")
+                
+            if maintenance_state:
+                maintenance_upper = maintenance_state.upper()
+                valid_maintenance = ["ON", "OFF"]
+                if maintenance_upper in valid_maintenance:
+                    predicates.append(f"Alert/maintenance_state={maintenance_upper}")
+                else:
+                    return f"Error: Invalid maintenance state '{maintenance_state}'. Valid states: {', '.join(valid_maintenance)}"
+            
+            # Combine predicates
+            if predicates:
+                predicate_string = "(" + ")&(".join(predicates) + ")"
+                query_params.append(predicate_string)
+            
+            # Add sorting (critical first, then by timestamp)
+            query_params.append("sortBy=Alert/state.desc,Alert/latest_timestamp.desc")
+        
+        # Construct full URL
+        if query_params:
+            endpoint += "?" + "&".join(query_params)
+        
+        response_data = await make_ambari_request(endpoint)
+        
+        if response_data is None or "error" in response_data:
+            error_msg = response_data.get("error", "Unknown error") if response_data else "No response"
+            return f"Error: Unable to retrieve current alerts - {error_msg}"
+        
+        # Handle summary formats
+        if format == "summary":
+            alerts_summary = response_data.get("alerts_summary", {})
+            if not alerts_summary:
+                return "No alert summary data available"
+            
+            result_lines = [
+                f"Alert Summary for {target_cluster}",
+                "=" * 40
+            ]
+            
+            total_alerts = 0
+            for state in ["CRITICAL", "WARNING", "OK", "UNKNOWN"]:
+                state_info = alerts_summary.get(state, {})
+                count = state_info.get("count", 0)
+                maintenance_count = state_info.get("maintenance_count", 0)
+                original_timestamp = state_info.get("original_timestamp", 0)
+                
+                total_alerts += count
+                
+                result_lines.append(f"{state}: {count} alerts")
+                if maintenance_count > 0:
+                    result_lines.append(f"  (Maintenance: {maintenance_count})")
+                if original_timestamp > 0:
+                    result_lines.append(f"  (Latest: {format_timestamp(original_timestamp)})")
+            
+            result_lines.extend([
+                "",
+                f"Total Alerts: {total_alerts}",
+                f"API Endpoint: {response_data.get('href', 'Not available')}"
+            ])
+            
+            return "\n".join(result_lines)
+        
+        elif format == "groupedSummary":
+            alerts_summary_grouped = response_data.get("alerts_summary_grouped", [])
+            if not alerts_summary_grouped:
+                return "No grouped alert summary data available"
+            
+            result_lines = [
+                f"Grouped Alert Summary for {target_cluster}",
+                "=" * 50,
+                f"Alert Definitions: {len(alerts_summary_grouped)}",
+                ""
+            ]
+            
+            for group in alerts_summary_grouped:
+                definition_id = group.get("definition_id", "Unknown")
+                definition_name = group.get("definition_name", "Unknown")
+                summary = group.get("summary", {})
+                
+                result_lines.append(f"Definition: {definition_name} (ID: {definition_id})")
+                
+                total_count = 0
+                for state in ["CRITICAL", "WARNING", "OK", "UNKNOWN"]:
+                    state_info = summary.get(state, {})
+                    count = state_info.get("count", 0)
+                    maintenance_count = state_info.get("maintenance_count", 0)
+                    latest_text = state_info.get("latest_text", "")
+                    
+                    if count > 0:
+                        result_lines.append(f"  {state}: {count}")
+                        if maintenance_count > 0:
+                            result_lines.append(f"    Maintenance: {maintenance_count}")
+                        if latest_text:
+                            text_display = latest_text if len(latest_text) <= 80 else latest_text[:77] + "..."
+                            result_lines.append(f"    Latest: {text_display}")
+                    
+                    total_count += count
+                
+                result_lines.append(f"  Total: {total_count}")
+                result_lines.append("")
+            
+            return "\n".join(result_lines)
+        
+        # Handle regular detailed/compact formats
+        items = response_data.get("items", [])
+        
+        if not items:
+            scope_desc = f"host '{host_name}'" if host_name else f"service '{service_name}'" if service_name else f"cluster '{target_cluster}'"
+            filter_desc = ""
+            if state_filter or definition_name or maintenance_state:
+                filters = []
+                if state_filter:
+                    filters.append(f"state={state_filter}")
+                if definition_name:
+                    filters.append(f"definition={definition_name}")
+                if maintenance_state:
+                    filters.append(f"maintenance={maintenance_state}")
+                filter_desc = f" with filters: {', '.join(filters)}"
+            return f"No current alerts found for {scope_desc}{filter_desc}"
+        
+        result_lines = []
+        
+        # Header information
+        scope_desc = f"host '{host_name}'" if host_name else f"service '{service_name}'" if service_name else f"cluster '{target_cluster}'"
+        
+        result_lines.extend([
+            f"Current Alerts for {scope_desc}",
+            "=" * 60,
+            f"Found {len(items)} alerts"
+        ])
+        
+        # Add filter information if any
+        if state_filter or definition_name or maintenance_state:
+            filter_info = []
+            if state_filter:
+                filter_info.append(f"State: {state_filter}")
+            if definition_name:
+                filter_info.append(f"Definition: {definition_name}")
+            if maintenance_state:
+                filter_info.append(f"Maintenance: {maintenance_state}")
+            result_lines.append(f"Filters: {', '.join(filter_info)}")
+        
+        result_lines.append("")
+        
+        if format == "compact":
+            # Compact format - one line per alert
+            result_lines.append("Current Alerts (compact):")
+            result_lines.append("State     | Maint | Service     | Host                    | Definition")
+            result_lines.append("-" * 85)
+            
+            for item in items:
+                alert = item.get("Alert", {})
+                state = alert.get("state", "UNKNOWN")
+                maintenance = alert.get("maintenance_state", "OFF")
+                service = alert.get("service_name", "N/A")
+                host = alert.get("host_name", "N/A")
+                definition = alert.get("definition_name", "Unknown")
+                
+                state_padded = state.ljust(9)
+                maint_padded = maintenance[:5].ljust(5)
+                service_padded = service[:11].ljust(11)
+                host_padded = host[:23].ljust(23)
+                definition_short = definition[:25] + "..." if len(definition) > 25 else definition
+                
+                result_lines.append(f"{state_padded} | {maint_padded} | {service_padded} | {host_padded} | {definition_short}")
+        
+        else:  # detailed format (default)
+            result_lines.append("Current Alerts (detailed):")
+            result_lines.append("")
+            
+            # Group by state for better organization
+            alerts_by_state = {"CRITICAL": [], "WARNING": [], "UNKNOWN": [], "OK": []}
+            
+            for item in items:
+                alert = item.get("Alert", {})
+                state = alert.get("state", "UNKNOWN")
+                if state not in alerts_by_state:
+                    alerts_by_state[state] = []
+                alerts_by_state[state].append(item)
+            
+            count = 0
+            for state in ["CRITICAL", "WARNING", "UNKNOWN", "OK"]:
+                alerts = alerts_by_state.get(state, [])
+                if not alerts:
+                    continue
+                
+                if count > 0:
+                    result_lines.append("")
+                
+                result_lines.append(f"=== {state} ALERTS ({len(alerts)}) ===")
+                result_lines.append("")
+                
+                for item in alerts:
+                    alert = item.get("Alert", {})
+                    
+                    # Basic information
+                    alert_id = alert.get("id", "Unknown")
+                    definition_name = alert.get("definition_name", "Unknown")
+                    definition_id = alert.get("definition_id", "Unknown")
+                    service_name = alert.get("service_name", "Unknown")
+                    component_name = alert.get("component_name", "Unknown")
+                    host_name_alert = alert.get("host_name", "N/A")
+                    label = alert.get("label", "No label")
+                    text = alert.get("text", "No description")
+                    instance = alert.get("instance", None)
+                    maintenance_state = alert.get("maintenance_state", "OFF")
+                    scope = alert.get("scope", "Unknown")
+                    
+                    # Timestamps
+                    latest_timestamp = alert.get("latest_timestamp", 0)
+                    original_timestamp = alert.get("original_timestamp", 0)
+                    
+                    count += 1
+                    result_lines.extend([
+                        f"[{count}] Alert ID: {alert_id}",
+                        f"    State: {state} ({'MAINTENANCE' if maintenance_state == 'ON' else 'ACTIVE'})",
+                        f"    Service: {service_name}",
+                        f"    Component: {component_name}",
+                        f"    Host: {host_name_alert}",
+                        f"    Scope: {scope}",
+                        f"    Definition: {definition_name} (ID: {definition_id})",
+                        f"    Label: {label}",
+                    ])
+                    
+                    if instance:
+                        result_lines.append(f"    Instance: {instance}")
+                    
+                    # Timestamps
+                    if latest_timestamp:
+                        result_lines.append(f"    Latest Update: {format_timestamp(latest_timestamp)}")
+                    if original_timestamp and original_timestamp != latest_timestamp:
+                        result_lines.append(f"    First Occurrence: {format_timestamp(original_timestamp)}")
+                    
+                    # Format alert text (handle multi-line text)
+                    if text:
+                        if "\n" in text:
+                            result_lines.append("    Text:")
+                            for line in text.split("\n"):
+                                result_lines.append(f"      {line}")
+                        else:
+                            text_display = text if len(text) <= 100 else text[:97] + "..."
+                            result_lines.append(f"    Text: {text_display}")
+                    
+                    # API reference
+                    api_href = item.get("href", "")
+                    if api_href:
+                        result_lines.append(f"    API: {api_href}")
+                    
+                    result_lines.append("")
+        
+        # Add summary statistics
+        state_counts = {}
+        maintenance_count = 0
+        for item in items:
+            alert = item.get("Alert", {})
+            state = alert.get("state", "UNKNOWN")
+            maintenance = alert.get("maintenance_state", "OFF")
+            
+            state_counts[state] = state_counts.get(state, 0) + 1
+            if maintenance == "ON":
+                maintenance_count += 1
+        
+        result_lines.extend([
+            "Summary:",
+            f"  Total Alerts: {len(items)}",
+            f"  In Maintenance: {maintenance_count}",
+        ])
+        
+        for state in ["CRITICAL", "WARNING", "OK", "UNKNOWN"]:
+            count = state_counts.get(state, 0)
+            if count > 0:
+                result_lines.append(f"  {state}: {count}")
+        
+        result_lines.append(f"\nAPI Endpoint: {response_data.get('href', 'Not available')}")
+        
+        return "\n".join(result_lines)
+        
+    except Exception as e:
+        return f"Error: Exception occurred while retrieving current alerts - {str(e)}"
+
+@mcp.tool()
 async def get_prompt_template(section: Optional[str] = None, mode: Optional[str] = None) -> str:
     """Return the canonical English prompt template (optionally a specific section).
 
