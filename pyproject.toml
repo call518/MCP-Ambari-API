@@ -11,11 +11,7 @@ requires-python = ">=3.11"
 dependencies = [
     "aiohttp>=3.12.15",
     "fastmcp>=2.11.1",
-]
-
-[project.optional-dependencies]
-dev = [
-    "pytest>=8.2.0"
+    "pytest>=8.2.0",
 ]
 
 [project.scripts]
@@ -32,4 +28,9 @@ include-package-data = true
 # Ensure non-Python resource files ship inside the wheel
 # You can broaden to ["*.md"] if more markdown resources are added later.
 mcp_ambari_api = ["prompt_template.md"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.1",
+]
 

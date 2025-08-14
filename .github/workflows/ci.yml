@@ -29,7 +29,11 @@ jobs:
     
     - name: Install dependencies and package
       run: |
-        uv sync --dev
+        uv sync
+        
+    - name: Verify installation
+      run: |
+        uv run python -c "import pytest; print(f'✓ pytest version: {pytest.__version__}')"
     
     - name: Run tests
       run: |
