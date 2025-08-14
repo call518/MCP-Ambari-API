@@ -60,6 +60,20 @@ This MCP server provides the following tools for Ambari cluster management:
   - Authentication details (LDAP user status, authentication sources)
   - Group memberships, privileges, and widget layouts
 
+### Alert Management
+- `get_alert_history` - Retrieve historical alert events from the cluster with comprehensive filtering:
+  - Scope filtering: cluster-wide, service-specific, or host-specific alerts
+  - State filtering: CRITICAL, WARNING, OK, UNKNOWN alerts
+  - Time range filtering: from/to timestamp support
+  - Definition filtering: filter by specific alert definition names
+  - Multiple output formats: detailed, summary, compact
+  - Pagination support for large datasets
+- `get_current_alerts` - Retrieve current/active alerts with real-time status:
+  - Current alert states across cluster, services, or hosts
+  - Maintenance mode filtering
+  - Summary formats: basic summary and grouped by definition
+  - Detailed alert information including timestamps and descriptions
+
 ## Prompt Template
 The package exposes a tool `get_prompt_template` that returns either the entire template, a specific section, or just the headings. Three MCP prompts (`prompt_template_full`, `prompt_template_headings`, `prompt_template_section`) are also registered for discovery.
 
