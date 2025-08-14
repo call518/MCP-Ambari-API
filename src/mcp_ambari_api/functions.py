@@ -483,3 +483,289 @@ async def format_single_host_details(host_name: str, cluster_name: str, show_hea
 
     except Exception as e:
         return f"Error: Exception occurred while retrieving host details for '{host_name}' - {str(e)}"
+
+
+# -----------------------------------------------------------------------------
+# Alert formatting utility functions
+# -----------------------------------------------------------------------------
+
+def format_alerts_output(items, mode, cluster, format_type, host_name, service_name, state_filter, **kwargs):
+    """
+    Unified alert output formatting function for both current alerts and alert history.
+    
+    Args:
+        items: List of alert items from API response
+        mode: "current" or "history"
+        cluster: Cluster name
+        format_type: "detailed", "summary", "compact", etc.
+        host_name: Optional host name filter
+        service_name: Optional service name filter  
+        state_filter: Optional state filter
+        **kwargs: Additional parameters (limit, from_timestamp, to_timestamp, etc.)
+    
+    Returns:
+        Formatted string output
+    """
+    if not items:
+        scope_desc = f"host '{host_name}'" if host_name else f"service '{service_name}'" if service_name else f"cluster '{cluster}'"
+        return f"No {mode} alerts found for {scope_desc}"
+    
+    # Common header
+    scope = f"host '{host_name}'" if host_name else f"service '{service_name}'" if service_name else f"cluster '{cluster}'"
+    title = "Current Alerts" if mode == "current" else "Alert History"
+    
+    result_lines = [
+        f"{title} for {scope}",
+        "=" * 60,
+        f"Found {len(items)} alerts"
+    ]
+    
+    # Add filter information if any
+    filters = []
+    if state_filter:
+        filters.append(f"State: {state_filter}")
+    if kwargs.get('definition_name'):
+        filters.append(f"Definition: {kwargs['definition_name']}")
+    if mode == "current" and kwargs.get('maintenance_state'):
+        filters.append(f"Maintenance: {kwargs['maintenance_state']}")
+    if mode == "history":
+        if kwargs.get('from_timestamp'):
+            filters.append(f"From: {format_timestamp(kwargs['from_timestamp'])}")
+        if kwargs.get('to_timestamp'):
+            filters.append(f"To: {format_timestamp(kwargs['to_timestamp'])}")
+    
+    if filters:
+        result_lines.append(f"Filters: {', '.join(filters)}")
+    
+    result_lines.append("")
+    
+    # Mode-specific field mapping
+    field_prefix = "Alert" if mode == "current" else "AlertHistory"
+    timestamp_field = "latest_timestamp" if mode == "current" else "timestamp"
+    
+    # Format based on type
+    if format_type == "summary":
+        result_lines.extend(format_alerts_summary(items, mode, field_prefix))
+    elif format_type == "compact":
+        result_lines.extend(format_alerts_compact(items, field_prefix, timestamp_field, mode, kwargs.get('limit')))
+    else:  # detailed
+        result_lines.extend(format_alerts_detailed(items, field_prefix, timestamp_field, mode, kwargs.get('limit')))
+    
+    return "\n".join(result_lines)
+
+
+def format_alerts_summary(items, mode, field_prefix):
+    """Format alerts in summary mode - grouped by state and definition."""
+    result_lines = []
+    
+    # Group by state and definition
+    state_counts = {}
+    definition_counts = {}
+    service_counts = {}
+    
+    for item in items:
+        alert_data = item.get(field_prefix, {})
+        state = alert_data.get("state", "UNKNOWN")
+        definition = alert_data.get("definition_name", "Unknown")
+        service = alert_data.get("service_name", "Unknown")
+        
+        state_counts[state] = state_counts.get(state, 0) + 1
+        definition_counts[definition] = definition_counts.get(definition, 0) + 1
+        service_counts[service] = service_counts.get(service, 0) + 1
+    
+    result_lines.append("Summary by State:")
+    for state in ["CRITICAL", "WARNING", "OK", "UNKNOWN"]:
+        count = state_counts.get(state, 0)
+        if count > 0:
+            result_lines.append(f"  {state}: {count}")
+    
+    result_lines.append("\nTop Alert Definitions:")
+    sorted_definitions = sorted(definition_counts.items(), key=lambda x: x[1], reverse=True)[:10]
+    for definition, count in sorted_definitions:
+        result_lines.append(f"  {definition}: {count}")
+    
+    result_lines.append("\nTop Services:")
+    sorted_services = sorted(service_counts.items(), key=lambda x: x[1], reverse=True)[:10]
+    for service, count in sorted_services:
+        result_lines.append(f"  {service}: {count}")
+    
+    return result_lines
+
+
+def format_alerts_compact(items, field_prefix, timestamp_field, mode, limit=None):
+    """Format alerts in compact mode - one line per alert."""
+    result_lines = []
+    
+    if mode == "current":
+        result_lines.append("Current Alerts (compact):")
+        result_lines.append("State     | Maint | Service     | Host                    | Definition")
+        result_lines.append("-" * 85)
+        
+        for item in items:
+            alert = item.get(field_prefix, {})
+            state = alert.get("state", "UNKNOWN")
+            maintenance = alert.get("maintenance_state", "OFF")
+            service = alert.get("service_name", "N/A")
+            host = alert.get("host_name", "N/A")
+            definition = alert.get("definition_name", "Unknown")
+            
+            state_padded = state.ljust(9)
+            maint_padded = maintenance[:5].ljust(5)
+            service_padded = service[:11].ljust(11)
+            host_padded = host[:23].ljust(23)
+            definition_short = definition[:25] + "..." if len(definition) > 25 else definition
+            
+            result_lines.append(f"{state_padded} | {maint_padded} | {service_padded} | {host_padded} | {definition_short}")
+    
+    else:  # history
+        result_lines.append("Alert History Entries (compact):")
+        result_lines.append("Timestamp                | State     | Service     | Host                    | Definition")
+        result_lines.append("-" * 100)
+        
+        count = 0
+        for item in items:
+            alert = item.get(field_prefix, {})
+            timestamp = alert.get(timestamp_field, 0)
+            state = alert.get("state", "UNKNOWN")
+            service = alert.get("service_name", "N/A")
+            host = alert.get("host_name", "N/A")
+            definition = alert.get("definition_name", "Unknown")
+            
+            time_str = format_timestamp(timestamp).split(" (")[1].rstrip(")")  # Extract readable part
+            state_padded = state.ljust(9)
+            service_padded = service[:11].ljust(11)
+            host_padded = host[:23].ljust(23)
+            definition_short = definition[:40] + "..." if len(definition) > 40 else definition
+            
+            result_lines.append(f"{time_str} | {state_padded} | {service_padded} | {host_padded} | {definition_short}")
+            
+            count += 1
+            if limit and count >= limit:
+                result_lines.append(f"... (showing first {limit} entries)")
+                break
+    
+    return result_lines
+
+
+def format_alerts_detailed(items, field_prefix, timestamp_field, mode, limit=None):
+    """Format alerts in detailed mode - full information per alert."""
+    result_lines = []
+    
+    if mode == "current":
+        result_lines.append("Current Alerts (detailed):")
+        result_lines.append("")
+        
+        # Group by state for better organization
+        alerts_by_state = {"CRITICAL": [], "WARNING": [], "UNKNOWN": [], "OK": []}
+        
+        for item in items:
+            alert = item.get(field_prefix, {})
+            state = alert.get("state", "UNKNOWN")
+            if state not in alerts_by_state:
+                alerts_by_state[state] = []
+            alerts_by_state[state].append(item)
+        
+        count = 0
+        for state in ["CRITICAL", "WARNING", "UNKNOWN", "OK"]:
+            alerts = alerts_by_state.get(state, [])
+            if not alerts:
+                continue
+            
+            if count > 0:
+                result_lines.append("")
+            
+            result_lines.append(f"=== {state} ALERTS ({len(alerts)}) ===")
+            result_lines.append("")
+            
+            for item in alerts:
+                alert = item.get(field_prefix, {})
+                count += 1
+                result_lines.extend(format_single_alert_detailed(alert, count, mode, timestamp_field))
+                result_lines.append("")
+                
+                if limit and count >= limit:
+                    result_lines.append(f"... (showing first {limit} entries)")
+                    break
+            
+            if limit and count >= limit:
+                break
+    
+    else:  # history
+        result_lines.append("Alert History Entries (detailed):")
+        result_lines.append("")
+        
+        count = 0
+        for item in items:
+            alert = item.get(field_prefix, {})
+            count += 1
+            result_lines.extend(format_single_alert_detailed(alert, count, mode, timestamp_field))
+            result_lines.append("")
+            
+            if limit and count >= limit:
+                result_lines.append(f"... (showing first {limit} entries)")
+                break
+    
+    return result_lines
+
+
+def format_single_alert_detailed(alert, count, mode, timestamp_field):
+    """Format a single alert in detailed view."""
+    result_lines = []
+    
+    # Basic information
+    alert_id = alert.get("id", "Unknown")
+    state = alert.get("state", "UNKNOWN")
+    definition_name = alert.get("definition_name", "Unknown")
+    definition_id = alert.get("definition_id", "Unknown")
+    service_name = alert.get("service_name", "Unknown")
+    component_name = alert.get("component_name", "Unknown")
+    host_name = alert.get("host_name", "N/A")
+    label = alert.get("label", "No label")
+    text = alert.get("text", "No description")
+    instance = alert.get("instance", None)
+    
+    result_lines.extend([
+        f"[{count}] Alert ID: {alert_id}",
+        f"    State: {state}",
+        f"    Service: {service_name}",
+        f"    Component: {component_name}",
+        f"    Host: {host_name}",
+        f"    Definition: {definition_name} (ID: {definition_id})",
+        f"    Label: {label}",
+    ])
+    
+    if instance:
+        result_lines.append(f"    Instance: {instance}")
+    
+    # Mode-specific fields
+    if mode == "current":
+        maintenance_state = alert.get("maintenance_state", "OFF")
+        scope = alert.get("scope", "Unknown")
+        result_lines.append(f"    Maintenance: {maintenance_state}")
+        result_lines.append(f"    Scope: {scope}")
+        
+        # Timestamps for current alerts
+        latest_timestamp = alert.get("latest_timestamp", 0)
+        original_timestamp = alert.get("original_timestamp", 0)
+        
+        if latest_timestamp:
+            result_lines.append(f"    Latest Update: {format_timestamp(latest_timestamp)}")
+        if original_timestamp and original_timestamp != latest_timestamp:
+            result_lines.append(f"    First Occurrence: {format_timestamp(original_timestamp)}")
+    
+    else:  # history
+        timestamp = alert.get(timestamp_field, 0)
+        if timestamp:
+            result_lines.append(f"    Timestamp: {format_timestamp(timestamp)}")
+    
+    # Format alert text
+    if text:
+        if "\n" in text:
+            result_lines.append("    Text:")
+            for line in text.split("\n"):
+                result_lines.append(f"      {line}")
+        else:
+            text_display = text if len(text) <= 100 else text[:97] + "..."
+            result_lines.append(f"    Text: {text_display}")
+    
+    return result_lines
