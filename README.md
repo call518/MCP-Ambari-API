@@ -1,3 +1,5 @@
+[![MSeeP.ai Security Assessment Badge](https://mseep.net/pr/call518-mcp-ambari-api-badge.png)](https://mseep.ai/app/call518-mcp-ambari-api)
+
 [![Deploy to PyPI with tag](https://github.com/call518/MCP-Ambari-API/actions/workflows/pypi-publish.yml/badge.svg)](https://github.com/call518/MCP-Ambari-API/actions/workflows/pypi-publish.yml)
 
 [![smithery badge](https://smithery.ai/badge/@call518/mcp-ambari-api)](https://smithery.ai/server/@call518/mcp-ambari-api)
