@@ -14,6 +14,7 @@ Model Context Protocol (MCP) server for Apache Ambari API integration. This proj
 - Monitor service and cluster status
 - Unified configuration introspection (single type or bulk with filtering / summarization)
 - Track request progress (request IDs surfaced for all operations)
+- Manage cluster users and access permissions
 
 ## Available MCP Tools
 
@@ -50,6 +51,14 @@ This MCP server provides the following tools for Ambari cluster management:
 ### Host Management
 - `list_hosts` - List all hosts in the cluster
 - `get_host_details` - Get detailed information for specific or all hosts (includes component states, hardware metrics, and service assignments)
+
+### User Management
+- `list_users` - List all users in the Ambari system with their usernames and API links
+- `get_user` - Get detailed information about a specific user including:
+  - Basic profile (ID, username, display name, user type)
+  - Status information (admin privileges, active status, login failures)
+  - Authentication details (LDAP user status, authentication sources)
+  - Group memberships, privileges, and widget layouts
 
 ## Prompt Template
 The package exposes a tool `get_prompt_template` that returns either the entire template, a specific section, or just the headings. Three MCP prompts (`prompt_template_full`, `prompt_template_headings`, `prompt_template_section`) are also registered for discovery.
