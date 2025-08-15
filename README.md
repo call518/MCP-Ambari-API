@@ -14,6 +14,10 @@ Model Context Protocol (MCP) server for Apache Ambari API integration. This proj
 
 - [Ambari API Documents](nhttps://github.com/apache/ambari/blob/trunk/ambari-server/docs/api/v1/index.md)
 
+## Example Query - Cluster Info/Status
+
+![Example: Querying Ambari Cluster(1)](img/ex-screenshot-1.png)
+
 ## How To Use
 
 Using this is very simple and straightforward. If you already have an MCP Tools environment running, just add the following configuration to your `mcp-config.json` file:
@@ -228,17 +232,14 @@ Smithery now passes the selected `AMBARI_LOG_LEVEL` both as env and `--log-level
 After logging in to OpenWebUI with an admin account, go to "Settings" → "Tools" from the top menu.
 Here, enter the Ambari-API address (e.g., `http://localhost:8000/ambari-api`) to connect MCP Tools with your Ambari cluster.
 
-### 5. Examples: Using MCP Tools to Query Ambari Cluster
+### 5. More Examples: Using MCP Tools to Query Ambari Cluster
 
 Below is an example screenshot showing how to query the Ambari cluster using MCP Tools in OpenWebUI:
 
-#### Example Query #1 - Cluster Info/Status
-![Example: Querying Ambari Cluster(1)](img/ex-screenshot-1.png)
-
-#### Example Query #2 - Cluster Configuration Review & Recommendations
+#### Example Query - Cluster Configuration Review & Recommendations
 ![Example: Querying Ambari Cluster(2)](img/ex-screenshot-2.png)
 
-#### Example Query #3 - Restart HDFS Service
+#### Example Query - Restart HDFS Service
 ![Example: Querying Ambari Cluster(3)](img/ex-screenshot-3-1.png)
 ![Example: Querying Ambari Cluster(3)](img/ex-screenshot-3-2.png)
 
