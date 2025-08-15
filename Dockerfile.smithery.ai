@@ -4,13 +4,12 @@ FROM rockylinux:9.3
 
 ARG PYTHON_VERSION=3.11
 
-ADD https://httpbin.org/uuid /tmp/uuid
-
-RUN cat /tmp/uuid >/dev/null && \
-    for i in $(seq 120 -1 1); do \
-      echo "Waiting... $i seconds remaining"; \
-      sleep 1; \
-    done
+# ADD https://httpbin.org/uuid /tmp/uuid
+# RUN cat /tmp/uuid >/dev/null && \
+#     for i in $(seq 120 -1 1); do \
+#       echo "Waiting... $i seconds remaining"; \
+#       sleep 1; \
+#     done
 
 # Base dependencies
 RUN dnf install -y python${PYTHON_VERSION} python${PYTHON_VERSION}-pip git && dnf clean all \
