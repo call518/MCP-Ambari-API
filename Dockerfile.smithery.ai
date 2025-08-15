@@ -4,27 +4,25 @@ FROM rockylinux:9.3
 
 ARG PYTHON_VERSION=3.11
 
-### Wait for Build Completion of pypi.org
-ADD https://httpbin.org/uuid /tmp/uuid
-RUN cat /tmp/uuid >/dev/null && \
-    for i in $(seq 120 -1 1); do \
-      echo "Waiting... $i seconds remaining"; \
-      sleep 1; \
-    done
-
 # Base dependencies
 RUN dnf install -y python${PYTHON_VERSION} python${PYTHON_VERSION}-pip git && dnf clean all \
         && update-alternatives --install /usr/bin/python python /usr/bin/python${PYTHON_VERSION} 1000 --slave /usr/bin/pip pip /usr/bin/pip${PYTHON_VERSION}
 
-RUN pip install --upgrade \
-        'uv>=0.8.5' \
-        'mcp>=1.12.3' \
-        'fastmcp>=2.11.1' \
-        'mcpo>=0.0.17' \
-        'requests>=2.32.4' \
-        'uvicorn>=0.35.0' \
-        'aiohttp>=3.12.15' \
-        'pytest>=8.2.0' \
-        'mcp-ambari-api'
+WORKDIR /app
+
+COPY . /app
+
+# Fetch git tags and update version
+RUN git fetch --tags origin && \
+    LATEST_TAG=$(git tag | tail -n 1) && \
+    echo "LATEST_TAG='$LATEST_TAG'" && \
+    sed -i "s|^version = \".*\"|version = \"${LATEST_TAG}\"|" pyproject.toml && \
+    rm -rf .git
+
+RUN pip install --upgrade 'uv>=0.8.5'
+
+RUN uv sync
+
+RUN pip install .
 
 CMD ["mcp-ambari-api"]
