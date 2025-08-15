@@ -14,6 +14,29 @@ Model Context Protocol (MCP) server for Apache Ambari API integration. This proj
 
 - [Ambari API Documents](nhttps://github.com/apache/ambari/blob/trunk/ambari-server/docs/api/v1/index.md)
 
+## How To Use
+
+Using this is very simple and straightforward. If you already have an MCP Tools environment running, just add the following configuration to your `mcp-config.json` file:
+
+```json
+{
+  "mcpServers": {
+    "ambari-api": {
+      "command": "uvx",
+      "args": ["--python", "3.11", "mcp-ambari-api"],
+      "env": {
+        "AMBARI_HOST": "host.docker.internal",
+        "AMBARI_PORT": "8080",
+        "AMBARI_USER": "admin",
+        "AMBARI_PASS": "admin",
+        "AMBARI_CLUSTER_NAME": "TEST-AMBARI",
+        "AMBARI_LOG_LEVEL": "INFO"
+      }
+    }
+  }
+}
+```
+
 ## Features
 
 - Manage Hadoop services (start, stop, restart)
@@ -122,40 +145,10 @@ Policy: Only English is stored; the LLM uses the English instructions for intern
 
 If you maintained automation calling the old tools, update to the unified form. The semantic output structure (plain text) remains similar; summary mode minimizes payload size, while full mode provides key=value pairs.
 
-## Main Tool Files
-
-- **Main MCP tool file**: `src/mcp_ambari_api/ambari_api.py`
-- **Utility functions**: `src/mcp_ambari_api/functions.py`
-
-## How To Use
-
-Using this Ambari API integration is very simple and straightforward. If you already have an MCP Tools environment running, just add the following configuration to your `mcp-config.json` file:
-
-```json
-{
-  "mcpServers": {
-    "ambari-api": {
-      "command": "uvx",
-      "args": ["--python", "3.11", "mcp-ambari-api"],
-      "env": {
-        "AMBARI_HOST": "host.docker.internal",
-        "AMBARI_PORT": "8080",
-        "AMBARI_USER": "admin",
-        "AMBARI_PASS": "admin",
-        "AMBARI_CLUSTER_NAME": "TEST-AMBARI",
-        "AMBARI_LOG_LEVEL": "INFO"
-      }
-    }
-  }
-}
-```
+## QuickStart (Demo): Setting Up MCP Tools Environment with Docker
 
 > Local Demo Tip: Start by copying the template: `cp mcp-config.json.local mcp-config.json` and then edit the values for your environment.
 
-## Self QuickStart (Demo): Setting Up MCP Tools Environment with Docker
-
-  "command": "mcp-ambari-api",
-  "args": [],
 ### Tested Env.
 
 - WSL2 Linux on Windows11
