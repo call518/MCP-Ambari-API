@@ -19,7 +19,7 @@ RUN git fetch --tags origin && \
     sed -i "s|^version = \".*\"|version = \"${LATEST_TAG}\"|" pyproject.toml && \
     rm -rf .git
 
-RUN pip install --upgrade 'uv>=0.8.5'
+RUN pip install --no-cache-dir --upgrade 'uv>=0.8.5'
 
 RUN uv sync
 
