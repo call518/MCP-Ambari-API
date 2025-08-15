@@ -18,6 +18,11 @@ build:
   dockerfile: "Dockerfile.smithery.ai"
   dockerBuildPath: "."
 
+testProfile:
+  command: pytest
+  directory: .
+  timeoutSeconds: 120
+
 startCommand:
   type: stdio
   # User-supplied configuration schema mapped to environment variables.
