@@ -14,7 +14,7 @@ services:
 
   # Optional: MCP Proxy Server for tools
   mcpo-proxy:
-    image: call518/mcpo-proxy-ambari-api:latest
+    image: call518/mcpo-proxy-ambari-api:1.0.1
     container_name: mcp-ambari-api-mcpo-proxy
     ports:
       - "8001:8000"
