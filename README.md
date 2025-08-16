@@ -4,8 +4,6 @@
 
 [![Deploy to PyPI with tag](https://github.com/call518/MCP-Ambari-API/actions/workflows/pypi-publish.yml/badge.svg)](https://github.com/call518/MCP-Ambari-API/actions/workflows/pypi-publish.yml)
 
-[![smithery badge](https://smithery.ai/badge/@call518/mcp-ambari-api)](https://smithery.ai/server/@call518/mcp-ambari-api)
-
 # MCP Ambari API
 
 Model Context Protocol (MCP) server for Apache Ambari API integration. This project provides tools for managing Hadoop clusters, including service operations, configuration management, status monitoring, and request tracking.
@@ -193,7 +191,6 @@ Control log verbosity via either environment variable or CLI flag:
 |--------|---------|
 | Environment variable | `export AMBARI_LOG_LEVEL=DEBUG` |
 | CLI flag (takes precedence) | `mcp-ambari-api --log-level DEBUG` |
-| Smithery config (added property) | Set `AMBARI_LOG_LEVEL` to desired level |
 
 Supported levels: DEBUG, INFO (default), WARNING, ERROR, CRITICAL.
 
@@ -210,8 +207,6 @@ or
 ```bash
 mcp-ambari-api --log-level DEBUG
 ```
-
-Smithery now passes the selected `AMBARI_LOG_LEVEL` both as env and `--log-level` flag so runtime overrides take effect immediately.
 
 ### 2. MCP Tools Environment Setup
 
@@ -265,20 +260,6 @@ Below is an example screenshot showing how to query the Ambari cluster using MCP
 - [ ] Repository/Stack version management (`repository-version-resources.md`, `stack-version-resources.md`)
 
 > Only the most practical and useful features are selected. Contributions and suggestions are welcome!
-
-## Appendix: Smithery Deployment
-
-Public Smithery deployment available for quick trials (no local setup) if you have a publicly reachable Ambari cluster. Open the server page and supply your Ambari connection values in the configuration form, then invoke tools immediately. Do NOT enter sensitive credentials unless you trust the environment. Link: https://smithery.ai/server/@call518/mcp-ambari-api
-
-![Smithery Deployment Screenshot](img/ex-screenshot-smithery.ai.png)
-
-### Installing via Smithery
-
-To install Ambari API Integration Server for Claude Desktop automatically via [Smithery](https://smithery.ai/server/@call518/mcp-ambari-api):
-
-```bash
-npx -y @smithery/cli install @call518/mcp-ambari-api --client claude
-```
 
 ## License
 
