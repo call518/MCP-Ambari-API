@@ -27,4 +27,5 @@ RUN uv sync
 
 RUN pip install .
 
-CMD ["mcp-ambari-api"]
+EXPOSE 8000
+CMD ["python", "-m", "mcp_airflow_api.airflow_api"]

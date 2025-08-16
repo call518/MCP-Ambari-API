@@ -20,6 +20,8 @@ build:
 
 startCommand:
   type: stdio
+  # type: http
+  # port: 8000
   # User-supplied configuration schema mapped to environment variables.
   configSchema:
     type: object

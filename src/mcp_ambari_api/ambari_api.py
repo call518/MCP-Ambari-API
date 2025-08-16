@@ -5,12 +5,12 @@ MCP tool definitions for Ambari REST API operations.
 """
 from typing import Dict, Optional, List
 import argparse
-from mcp.server.fastmcp import FastMCP
+from fastmcp import FastMCP
 import os
 import importlib.resources as pkg_resources
 import asyncio  # Add this import at the top of the file to use asyncio.sleep
 import logging
-from .functions import (
+from mcp_ambari_api.functions import (
     format_timestamp, 
     format_single_host_details, 
     make_ambari_request,
@@ -20,6 +20,16 @@ from .functions import (
     get_current_time_context,
     safe_timestamp_compare
 )
+# from .functions import (
+#     format_timestamp, 
+#     format_single_host_details, 
+#     make_ambari_request,
+#     AMBARI_CLUSTER_NAME,
+#     log_tool,
+#     format_alerts_output,
+#     get_current_time_context,
+#     safe_timestamp_compare
+# )
 
 # Set up logging (initial level from env; may be overridden by --log-level)
 logging.basicConfig(
@@ -2126,6 +2136,8 @@ def main(argv: Optional[List[str]] = None):
         logger.debug("Log level from environment: %s", logging.getLogger().level)
 
     mcp.run(transport='stdio')
+    # mcp.run(transport='http')
+    # mcp.run(transport="streamable-http", path="/",)
 
 if __name__ == "__main__":
     main()

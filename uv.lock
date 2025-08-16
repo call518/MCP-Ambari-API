@@ -683,7 +683,6 @@ source = { editable = "." }
 dependencies = [
     { name = "aiohttp" },
     { name = "fastmcp" },
-    { name = "mcp" },
     { name = "requests" },
     { name = "uvicorn" },
 ]
@@ -692,7 +691,6 @@ dependencies = [
 requires-dist = [
     { name = "aiohttp", specifier = ">=3.12.15" },
     { name = "fastmcp", specifier = ">=2.11.1" },
-    { name = "mcp", specifier = ">=1.12.3" },
     { name = "requests", specifier = ">=2.32.4" },
     { name = "uvicorn", specifier = ">=0.35.0" },
 ]
