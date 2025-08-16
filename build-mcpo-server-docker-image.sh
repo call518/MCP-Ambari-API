@@ -6,7 +6,7 @@ IMAGE_NAME="call518/mcpo-proxy-ambari-api"
 
 # CUSTOM_TAG="${1:-latest}"
 TAGs="
-1.0.0
+1.0.1
 latest
 "
 

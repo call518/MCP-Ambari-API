@@ -25,4 +25,4 @@ RUN pip install \
         'fastmcp>=2.11.1' \
         'aiohttp>=3.12.0'
 
-CMD ["mcpo", "--host", "0.0.0.0", "--port", "8000", "--config", "/app/config/mcp-config.json"]
+CMD ["mcpo", "--host", "0.0.0.0", "--port", "8000", "--config", "/app/config/mcp-config.json", "--hot-reload"]
