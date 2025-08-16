@@ -12,14 +12,34 @@ services:
       - "host.docker.internal:host-gateway"
     restart: always
 
-  # Optional: MCP Proxy Server for tools
+  mcp-server:
+    image: call518/mcp-server-ambari-api:1.0.0
+    container_name: mcp-ambari-api-mcp-server
+    ports:
+      - "18001:18000"
+    environment:
+      - PYTHONPATH=/app/src
+      - MCP_SERVER_PORT=18000
+      - AMBARI_HOST=host.docker.internal
+      - AMBARI_PORT=7070
+      - AMBARI_USER=admin
+      - AMBARI_PASS=changeme!@34
+      - AMBARI_CLUSTER_NAME=TEST-AMBARI
+      - AMBARI_LOG_LEVEL=INFO
+    volumes:
+      - ./src:/app/src/
+      - ./scripts:/app/scripts
+    restart: always
+
   mcpo-proxy:
-    image: call518/mcpo-proxy-ambari-api:1.0.1
+    image: call518/mcpo-proxy-ambari-api:1.0.2
     container_name: mcp-ambari-api-mcpo-proxy
+    depends_on:
+      - mcp-server
     ports:
       - "8001:8000"
     volumes:
-      - ./mcp-config.json:/app/config/mcp-config.json
+      - ./mcp-config.json.streamable-http:/app/config/mcp-config.json
       - ./src:/app/src
     restart: always
 

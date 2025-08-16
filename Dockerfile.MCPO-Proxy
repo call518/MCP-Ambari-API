@@ -6,18 +6,10 @@ RUN mkdir -p /app/config
 
 WORKDIR /app
 
-RUN dnf install -y python${PYTHON_VERSION} python${PYTHON_VERSION}-pip git procps-ng lsof telnet wget && dnf clean all \
+RUN dnf install -y epel-release \
+        && dnf install -y python${PYTHON_VERSION} python${PYTHON_VERSION}-pip git procps-ng lsof telnet screen iputils \
+        && dnf clean all \
         && update-alternatives --install /usr/bin/python python /usr/bin/python${PYTHON_VERSION} 1000 --slave /usr/bin/pip pip /usr/bin/pip${PYTHON_VERSION}
-
-# RUN pip install \
-#         'uv>=0.8.5' \
-#         'mcpo>=0.0.17' \
-#         'mcp>=1.12.3' \
-#         'fastmcp>=2.11.1' \
-#         'mcp-server-time>=2025.8.4' \
-#         'mcp-server-fetch>=2025.1.17' \
-#         'httpx>=0.28.1' \
-#         'aiohttp>=3.12.0'
 
 RUN pip install \
         'uv>=0.8.5' \

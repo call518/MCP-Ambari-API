@@ -16,9 +16,13 @@ Model Context Protocol (MCP) server for Apache Ambari API integration. This proj
 
 ![Example: Querying Ambari Cluster(1)](img/ex-screenshot-1.png)
 
-## How To Use
+## Usages
+
+This MCP server supports two connection modes: **stdio** (traditional) and **streamable-http** (Docker-based). The transport mode is automatically determined by the `MCP_SERVER_PORT` environment variable.
 
 Using this is very simple and straightforward. If you already have an MCP Tools environment running, just add the following configuration to your `mcp-config.json` file:
+
+### Method 1: Traditional stdio Mode (Local Installation)
 
 ```json
 {
@@ -38,6 +42,23 @@ Using this is very simple and straightforward. If you already have an MCP Tools 
   }
 }
 ```
+
+### Method 2: Docker streamable-http Mode
+
+```json
+{
+  "mcpServers": {
+    "ambari-api": {
+      "type": "streamable-http",
+      "url": "http://host.docker.internal:18001/mcp"
+    }
+  }
+}
+```
+
+**Transport Selection Logic:**
+- **stdio mode**: When `MCP_SERVER_PORT` environment variable is NOT set
+- **streamable-http mode**: When `MCP_SERVER_PORT` environment variable is set
 
 ## Features
 
@@ -108,52 +129,13 @@ This MCP server provides the following tools for Ambari cluster management:
     - Multiple output formats: detailed, summary, compact
     - Unified API for consistent alert querying experience
 
-## Prompt Template
-The package exposes a tool `get_prompt_template` that returns either the entire template, a specific section, or just the headings. Three MCP prompts (`prompt_template_full`, `prompt_template_headings`, `prompt_template_section`) are also registered for discovery.
+---
 
-### MCP Prompts
-
-For easier discoverability in MCP clients (so `prompts/list` is not empty), the server now registers three prompts:
-
-- `prompt_template_full` – returns the full canonical template
-- `prompt_template_headings` – returns only the section headings
-- `prompt_template_section` – takes a `section` argument (number or keyword) and returns that section
-
-You can still use the `get_prompt_template` tool for programmatic access or when you prefer tool invocation over prompt retrieval.
-
-Single canonical English prompt template guides safe and efficient tool selection.
-
-Files:
-
-- Packaged: `src/mcp_ambari_api/prompt_template.md` (distributed with PyPI)
-- (Optional workspace root copy `PROMPT_TEMPLATE.md` may exist for editing; packaged copy is the one loaded at runtime.)
-
-Retrieve dynamically via MCP tool:
-
-- `get_prompt_template()` – full template
-- `get_prompt_template("tool map")` – only the tool mapping section
-- `get_prompt_template("5")` – section 5 (formatting guidelines)
-- `get_prompt_template(mode="headings")` – list all section headings
-
-Policy: Only English is stored; the LLM uses the English instructions for internal reasoning regardless of the user's language, and user-facing responses may be generated in any language as needed.
-
-### Configuration Tool Migration Notes
-
-| Removed | Replacement | Notes |
-|---------|-------------|-------|
-| `get_configurations` | `dump_configurations(config_type=...)` | Single type retrieval now goes through unified tool |
-| `list_configurations` | `dump_configurations(summarize=True)` | Summary listing of all types (sample keys) |
-| `dump_all_configurations` | `dump_configurations` | Renamed & expanded (adds service_filter, keys-only mode) |
-
-If you maintained automation calling the old tools, update to the unified form. The semantic output structure (plain text) remains similar; summary mode minimizes payload size, while full mode provides key=value pairs.
-
-## QuickStart (Demo): Setting Up MCP Tools Environment with Docker
-
-> Local Demo Tip: Start by copying the template: `cp mcp-config.json.local mcp-config.json` and then edit the values for your environment.
+## QuickStart (Demo - streamable-http): Running OpenWebUI and MCP-Ambari-API with Docker
 
 ### Tested Env.
 
-- WSL2 Linux on Windows11
+- WSL2 Linux on Windows11 (networkingMode = bridged)
 - Ambari-3.0 Cluster
 
 ### 1. Prepare Ambari Cluster (Test Target)
@@ -161,10 +143,6 @@ If you maintained automation calling the old tools, update to the unified form. 
 To set up a Ambari Demo cluster, follow the guide at: [Install Ambari 3.0 with Docker](https://medium.com/@call518/install-ambari-3-0-with-docker-297a8bb108c8)
 
 ![Example: Ambari Demo Cluster](img/ex-ambari.png)
-
-
-If running inside the provided container image, the package is installed and exposes the `mcp-ambari-api` console script (entry point defined in `pyproject.toml`). Avoid invoking the module path directly to prevent relative import errors.
-Once your Ambari cluster is ready, check the following environment variables in your `mcp-config.json` file:
 
 ```json
 "PYTHONPATH": "/app/src",
@@ -175,51 +153,22 @@ Once your Ambari cluster is ready, check the following environment variables in 
 "AMBARI_CLUSTER_NAME": "TEST-AMBARI",
 "AMBARI_LOG_LEVEL": "INFO"
 ```
-Make sure these values match your Ambari cluster setup.
 
-### Logging & Observability
-
-The server emits structured log lines for every tool invocation and HTTP request helper:
-
-- Prefixes: `TOOL START`, `TOOL SUCCESS`, `TOOL ERROR_RETURN`, `TOOL EXCEPTION`
-- Each line includes elapsed time (ms) and basic size metadata.
-- Under DEBUG level, additional HTTP request diagnostics (endpoint, status, timing) are printed.
-
-Control log verbosity via either environment variable or CLI flag:
-
-| Method | Example |
-|--------|---------|
-| Environment variable | `export AMBARI_LOG_LEVEL=DEBUG` |
-| CLI flag (takes precedence) | `mcp-ambari-api --log-level DEBUG` |
-
-Supported levels: DEBUG, INFO (default), WARNING, ERROR, CRITICAL.
-
-Recommendations:
-- Use DEBUG temporarily when diagnosing failed Ambari requests or performance.
-- Keep INFO for normal operations (includes start/success summaries only).
-- Elevate to WARNING/ERROR in very noisy multi-tenant environments.
-
-Example (one-off):
-```bash
-AMBARI_LOG_LEVEL=DEBUG mcp-ambari-api
-```
-or
-```bash
-mcp-ambari-api --log-level DEBUG
-```
+(NOTE) Make sure these values match your Ambari cluster setup.
 
 ### 2. MCP Tools Environment Setup
 
 1. Ensure Docker and Docker Compose are installed on your system.
 2. Clone this repository and navigate to its root directory.
-3. Start the OpenWebUI and MCPO-Proxy environment:
+3. Check and update `docker-compose.yml`.
+4. Start the OpenWebUI and MCPO-Proxy environment:
    ```bash
    docker-compose up -d
    ```
 
-- OpenWebUI will be available at the port specified in your `docker-compose.yml` (default: 3000 or as configured). You can access OpenWebUI at: [http://localhost:3000](http://localhost:3000)
+- OpenWebUI will be available at the port specified in your `docker-compose.yml` (default: 3000 or as configured). You can access OpenWebUI at: (e.g.) http://localhost:3000
 - The MCPO-Proxy will be accessible for API requests and cluster management, and its port is also specified in your `docker-compose.yml` (default: 8000 or as configured).
-- The list of MCP tool features provided by `src/mcp_ambari_api/ambari_api.py` can be found in the MCPO API Docs: [http://localhost:8000/ambari-api/docs](http://localhost:8000/ambari-api/docs)
+- The list of MCP tool features provided by `src/mcp_ambari_api/ambari_api.py` can be found in the MCPO API Docs: (e.g.) http://localhost:8000/ambari-api/docs
 ![Example: MCPO-Proxy](img/mcpo-proxy-api-docs.png)
 
 ### 4. Registering the Ambari-API MCP Tool in OpenWebUI

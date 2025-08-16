@@ -1,14 +1,14 @@
 #!/bin/bash
 set -euo pipefail
 
-Dockerfile_PATH="./Dockerfile.MCPO-Proxy"
-IMAGE_NAME="call518/mcpo-proxy-ambari-api"
+Dockerfile_PATH="./Dockerfile.MCP-Server"
+IMAGE_NAME="call518/mcp-server-ambari-api"
 
 echo "=== Building Docker image Name: ${IMAGE_NAME} ==="
 
 # CUSTOM_TAG="${1:-latest}"
 TAGs="
-1.0.2
+1.0.0
 latest
 "
 
