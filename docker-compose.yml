@@ -39,7 +39,7 @@ services:
     ports:
       - "8001:8000"
     volumes:
-      - ./mcp-config.json.streamable-http:/app/config/mcp-config.json
+      - ./mcp-config.json.http:/app/config/mcp-config.json
       - ./src:/app/src
     restart: always
 
