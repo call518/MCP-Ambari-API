@@ -16,19 +16,19 @@ Model Context Protocol (MCP) server for Apache Ambari API integration. This proj
 
 ## Usages
 
-This MCP server supports two connection modes: **stdio** (traditional) and **streamable-http** (Docker-based). The transport mode is automatically determined by the `MCP_SERVER_PORT` environment variable.
+This MCP server supports two connection modes: **stdio** (traditional) and **http** (Docker-based). The transport mode is automatically determined by the `MCP_SERVER_PORT` environment variable.
 
 **Transport Selection Logic:**
 
-- **streamable-http mode**: When `MCP_SERVER_PORT` environment variable is set
+- **http mode**: When `MCP_SERVER_PORT` environment variable is set
 - **stdio mode**: When `MCP_SERVER_PORT` environment variable is NOT set
 
 ```python
-    ### streamable-http mode
+    ### http mode
     if os.getenv("MCP_SERVER_PORT"):
         port = int(os.getenv("PORT", "18000"))
         logger.info(f"Starting HTTP server on port {port} for smithery.ai")
-        mcp.run(transport="http", host="0.0.0.0", port=port)
+        mcp.run(transport="streamable-http", host="0.0.0.0", port=port)
     ### stdio mode
     else:
         logger.info("Starting stdio transport for local usage")
