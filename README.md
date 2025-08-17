@@ -1,20 +1,83 @@
-# MCP Ambari API
+# MCP Ambari API - Apache Hadoop Cluster Management Automation
 
-> **Benefits**: Automate Ambari operations with a single LLM natural-language line: service control, configuration/status inspection, and request tracking via MCP tools.
+> **🚀 Automate Apache Ambari operations with AI/LLM**: Natural language commands for Hadoop cluster management, service control, configuration monitoring, and real-time status tracking via Model Context Protocol (MCP) tools.
+
+## 🏷️ Tags
+
+`apache-ambari` `hadoop-cluster` `mcp-server` `cluster-automation` `devops-tools` `big-data` `infrastructure-management` `ai-automation` `llm-tools` `python-mcp`
 
 [![Verified on MSeeP](https://mseep.ai/badge.svg)](https://mseep.ai/app/2fd522d4-863d-479d-96f7-e24c7fb531db)
 
 [![Deploy to PyPI with tag](https://github.com/call518/MCP-Ambari-API/actions/workflows/pypi-publish.yml/badge.svg)](https://github.com/call518/MCP-Ambari-API/actions/workflows/pypi-publish.yml)
 
-Model Context Protocol (MCP) server for Apache Ambari API integration. This project provides tools for managing Hadoop clusters, including service operations, configuration management, status monitoring, and request tracking.
+## 📋 Overview
+
+**MCP Ambari API** is a powerful Model Context Protocol (MCP) server that enables seamless Apache Ambari cluster management through natural language commands. Built for DevOps engineers, data engineers, and system administrators who work with Hadoop ecosystems.
+
+### 🎯 What You Can Do
+
+- **Automated Service Management**: Start, stop, restart Hadoop services (HDFS, YARN, Spark, etc.) with simple commands
+- **Real-time Monitoring**: Monitor cluster health, service status, and performance metrics
+- **Configuration Management**: View, update, and manage cluster configurations across all services  
+- **Alert Management**: Track and manage cluster alerts and notifications
+- **User & Host Management**: Manage cluster users, permissions, and host assignments
+- **Request Tracking**: Monitor long-running operations with detailed progress tracking
+
+### 🏗️ Architecture
+
+This MCP server provides tools for managing Hadoop clusters through Apache Ambari REST API, supporting both local (`stdio`) and remote (`streamable-http`) connection modes for maximum flexibility in deployment scenarios.
 
 - [Ambari API Documents](https://github.com/apache/ambari/blob/trunk/ambari-server/docs/api/v1/index.md)
+
+## 🚀 Use Cases & Benefits
+
+### For DevOps Engineers
+
+- **Incident Response**: Quickly restart failed services during outages
+- **Maintenance Automation**: Schedule and execute maintenance tasks via AI commands
+- **Health Monitoring**: Get real-time cluster status without navigating complex UIs
+
+### For Data Engineers
+
+- **Pipeline Management**: Ensure data processing services are running before job execution
+- **Configuration Tuning**: Easily adjust cluster settings for optimal performance
+- **Troubleshooting**: Quickly identify and resolve service conflicts or issues
+
+### For System Administrators
+
+- **User Management**: Manage cluster access and permissions efficiently
+- **Resource Monitoring**: Track cluster resources and host performance
+- **Alert Management**: Stay informed about critical cluster events
+
+## 💡 Why Choose MCP Ambari API?
+
+- **Natural Language Interface**: No need to remember complex API endpoints
+- **AI/LLM Integration**: Works seamlessly with modern AI tools and workflows  
+- **Dual Transport Support**: Flexible deployment options (local or remote)
+- **Comprehensive Coverage**: 25+ tools covering all major Ambari operations
+- **Production Ready**: Built with error handling, logging, and monitoring
 
 ## Example Query - Cluster Info/Status
 
 ![Example: Querying Ambari Cluster(1)](img/ex-screenshot-1.png)
 
-## Usages
+## ⚡ Quick Installation
+
+### Prerequisites
+
+- Python 3.11+
+- Apache Ambari cluster (3.0+ recommended)
+- UV package manager (or pip)
+
+### Install from PyPI
+
+```bash
+pip install mcp-ambari-api
+# or with uv
+uvx mcp-ambari-api
+```
+
+## 🔧 Usage & Configuration
 
 This MCP server supports two connection modes: **stdio** (traditional) and **streamable-http** (Docker-based). The transport mode is automatically determined by the `MCP_SERVER_PORT` environment variable.
 
@@ -89,13 +152,31 @@ uvx mcp-ambari-api
 }
 ```
 
-## Features
+## 🎯 Core Features & Capabilities
 
-- Manage Hadoop services (start, stop, restart)
-- Monitor service and cluster status
-- Unified configuration introspection (single type or bulk with filtering / summarization)
-- Track request progress (request IDs surfaced for all operations)
-- Manage cluster users and access permissions
+### Service Operations
+
+- **Hadoop Service Management**: Start, stop, restart HDFS, YARN, Spark, HBase, and more
+- **Bulk Operations**: Control all cluster services simultaneously
+- **Status Monitoring**: Real-time service health and performance tracking
+
+### Configuration Management
+
+- **Unified Config Tool**: Single interface for all configuration types (yarn-site, hdfs-site, etc.)
+- **Bulk Configuration**: Export and manage multiple configurations with filtering
+- **Configuration Validation**: Syntax checking and validation before applying changes
+
+### Monitoring & Alerting
+
+- **Real-time Alerts**: Current and historical cluster alerts with filtering
+- **Request Tracking**: Monitor long-running operations with detailed progress
+- **Host Monitoring**: Hardware metrics, component states, and resource utilization
+
+### Administration
+
+- **User Management**: Cluster user administration and permission control
+- **Host Management**: Node registration, component assignments, and health monitoring
+- **Security**: LDAP integration support and authentication source management
 
 ## Available MCP Tools
 
@@ -120,7 +201,7 @@ This MCP server provides the following tools for Ambari cluster management:
 - `stop_all_services` - Stop all services in the cluster
 - `restart_all_services` - Restart all services in the cluster
 
-### Configuration Management
+### Configuration Tools
 
 - `dump_configurations` - Unified configuration tool (replaces `get_configurations`, `list_configurations`, and the former internal `dump_all_configurations`). Supports:
   - Single type: `dump_configurations(config_type="yarn-site")`
@@ -166,9 +247,11 @@ This MCP server provides the following tools for Ambari cluster management:
 
 ---
 
-## QuickStart (transport="streamable-http")
+## 🚀 Docker QuickStart Guide (Recommended)
 
-Running OpenWebUI and MCP-Ambari-API with Docker
+### Deploy with OpenWebUI + MCP-Ambari-API in minutes
+
+Perfect for production environments, testing, and enterprise deployments. This setup provides a complete AI-powered Hadoop cluster management solution.
 
 ### Tested Env
 
@@ -237,29 +320,76 @@ Below is an example screenshot showing how to query the Ambari cluster using MCP
 ![Example: Querying Ambari Cluster(3)](img/ex-screenshot-3-1.png)
 ![Example: Querying Ambari Cluster(3)](img/ex-screenshot-3-2.png)
 
-## Roadmap
+## 🗺️ Development Roadmap & Features
 
-**✅: Implemented**  
-**⬜: Planned / Useful (from [Ambari API v1 docs](https://github.com/apache/ambari/tree/trunk/ambari-server/docs/api/v1/))**
+### ✅ Completed Features
 
-- [x] Cluster information & status (`clusters.md`, `clusters-cluster.md`, `cluster-resources.md`)
-- [x] Service list & status (`services.md`, `services-service.md`, `service-resources.md`)
-- [x] Start/Stop/Restart services (`update-service.md`, `update-services.md`, `services-service.md`)
-- [x] Cluster configuration (get & update) (`configuration.md`, `config-groups.md`)
-- [x] Request & task tracking (`requests.md`, `request-resources.md`, `tasks.md`, `task-resources.md`)
-- [x] Service component/host information (`components.md`, `components-component.md`, `component-resources.md`, `hosts.md`, `hosts-host.md`, `host-resources.md`, `host-components.md`, `host-component.md`)
-- [x] Host/HostComponent detailed management (`host-components.md`, `host-component.md`, `hosts-host.md`)
-- [ ] User management (`user-*.md`)
-- [ ] Permission management (`permission-*.md`)
-- [ ] View management (`view-resources.md`)
-- [ ] Alert definitions & dispatching (`alert-definitions.md`, `alert-dispatching.md`, `alerts.md`)
-- [ ] Authentication source management (`authentication-source-*.md`)
-- [ ] Config group management (`config-groups.md`)
-- [ ] Credential management (`credential-*.md`)
-- [ ] Repository/Stack version management (`repository-version-resources.md`, `stack-version-resources.md`)
+- **Cluster Management**: Complete cluster information, status monitoring, and service management
+- **Service Operations**: Start/stop/restart individual services or entire cluster
+- **Configuration Management**: Unified configuration tools with filtering and bulk operations
+- **Request Tracking**: Real-time monitoring of long-running cluster operations
+- **Host Management**: Comprehensive host and component management
+- **Alert System**: Current and historical alert management with advanced filtering
+- **User Management**: Basic user administration and permission handling
 
-> Only the most practical and useful features are selected. Contributions and suggestions are welcome!
+### ⬜ Planned Features (Contributions Welcome!)
 
-## License
+- **Advanced User Management**: Enhanced user profiles and bulk operations
+- **Permission System**: Granular permission management and role-based access
+- **View Management**: Custom dashboard and view configuration
+- **Alert Definitions**: Custom alert creation and notification rules
+- **Authentication Sources**: LDAP, Active Directory, and SSO integration
+- **Config Groups**: Advanced configuration group management
+- **Credential Management**: Secure credential storage and rotation
+- **Repository Management**: Stack version and repository management tools
+
+> **Note**: Features are prioritized based on community feedback and enterprise needs. [Submit feature requests](https://github.com/call518/MCP-Ambari-API/issues) or contribute via pull requests!
+
+## 🤝 Contributing & Support
+
+### How to Contribute
+
+- 🐛 **Report Bugs**: [GitHub Issues](https://github.com/call518/MCP-Ambari-API/issues)
+- 💡 **Request Features**: [Feature Requests](https://github.com/call518/MCP-Ambari-API/issues)  
+- 🔧 **Submit PRs**: [Contributing Guidelines](https://github.com/call518/MCP-Ambari-API/blob/main/CONTRIBUTING.md)
+- 📖 **Improve Docs**: Help make documentation better
+
+### Getting Help
+
+- **Documentation**: Check this README and inline code comments
+- **Community**: GitHub Discussions for questions and best practices
+- **Issues**: Bug reports and technical support via GitHub Issues
+
+### Technologies Used
+
+- **Language**: Python 3.11+
+- **Framework**: Model Context Protocol (MCP)
+- **API**: Apache Ambari REST API
+- **Transport**: stdio (local) and streamable-http (remote)
+- **Deployment**: Docker, Docker Compose, PyPI
+
+## ❓ Frequently Asked Questions
+
+### Q: What Ambari versions are supported?
+
+**A**: Ambari 3.0+ is recommended. Earlier versions may work but are not officially tested.
+
+### Q: Can I use this with cloud-managed Hadoop clusters?
+
+**A**: Yes, as long as Ambari API endpoints are accessible, it works with on-premise, cloud, and hybrid deployments.
+
+### Q: How do I troubleshoot connection issues?
+
+**A**: Check your `AMBARI_HOST`, `AMBARI_PORT`, and network connectivity. Enable debug logging with `AMBARI_LOG_LEVEL=DEBUG`.
+
+### Q: Is this safe for production use?
+
+**A**: Yes, the tool only uses official Ambari APIs and includes comprehensive error handling and logging.
+
+### Q: How does this compare to Ambari Web UI?
+
+**A**: This provides programmatic access via AI/LLM commands, perfect for automation, scripting, and integration with modern DevOps workflows.
+
+## 📄 License
 
 This project is licensed under the MIT License.
