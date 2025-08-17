@@ -37,7 +37,7 @@ This MCP server supports two connection modes: **stdio** (traditional) and **str
 
 Using this is very simple and straightforward. If you already have an MCP Tools environment running, just add the following configuration to your `mcp-config.json` file:
 
-### Method 1: Local MCP (transport=stdio)
+### Method 1: Local MCP (transport="stdio")
 
 ```json
 {
