@@ -2139,7 +2139,7 @@ def main(argv: Optional[List[str]] = None):
     # mcp.run(transport='http', host="127.0.0.1", port=18000)
     # mcp.run(transport="streamable-http", host="127.0.0.1", port=18000)
     
-    # MCP_SERVER_PORT 환경변수가 있으면 http, 없으면 stdio
+    # MCP_SERVER_PORT 환경변수가 있으면 streamable-http, 없으면 stdio
     if os.getenv("MCP_SERVER_PORT"):
         # MCP_SERVER_PORT 있음 → streamable-http transport
         port = int(os.getenv("PORT", "18000"))
