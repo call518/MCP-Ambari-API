@@ -2141,7 +2141,7 @@ def main(argv: Optional[List[str]] = None):
     
     # MCP_SERVER_PORT 환경변수가 있으면 http, 없으면 stdio
     if os.getenv("MCP_SERVER_PORT"):
-        # MCP_SERVER_PORT 있음 → http transport
+        # MCP_SERVER_PORT 있음 → streamable-http transport
         port = int(os.getenv("PORT", "18000"))
         logger.info(f"Starting HTTP server on port {port} for smithery.ai")
         # mcp.run(transport='http', host="0.0.0.0", port=port)

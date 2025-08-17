@@ -16,15 +16,15 @@ Model Context Protocol (MCP) server for Apache Ambari API integration. This proj
 
 ## Usages
 
-This MCP server supports two connection modes: **stdio** (traditional) and **http** (Docker-based). The transport mode is automatically determined by the `MCP_SERVER_PORT` environment variable.
+This MCP server supports two connection modes: **stdio** (traditional) and **streamable-http** (Docker-based). The transport mode is automatically determined by the `MCP_SERVER_PORT` environment variable.
 
 **Transport Selection Logic:**
 
-- **http mode**: When `MCP_SERVER_PORT` environment variable is set
+- **streamable-http mode**: When `MCP_SERVER_PORT` environment variable is set
 - **stdio mode**: When `MCP_SERVER_PORT` environment variable is NOT set
 
 ```python
-    ### http mode
+    ### streamable-http mode
     if os.getenv("MCP_SERVER_PORT"):
         port = int(os.getenv("PORT", "18000"))
         logger.info(f"Starting HTTP server on port {port} for smithery.ai")
@@ -58,7 +58,7 @@ Using this is very simple and straightforward. If you already have an MCP Tools 
 }
 ```
 
-### Method 2: Remote MCP (transport=http)
+### Method 2: Remote MCP (transport="streamable-http")
 
 **On MCP-Server Host:**
 
@@ -66,7 +66,7 @@ Using this is very simple and straightforward. If you already have an MCP Tools 
 pip install uv
 pip install mcp-ambari-api
 
-export AMBARI_HOST="host.docker.internal""
+export AMBARI_HOST="host.docker.internal"
 export AMBARI_PORT="8080"
 export AMBARI_USER="admin"
 export AMBARI_PASS="admin"
@@ -82,7 +82,7 @@ uvx mcp-ambari-api
 {
   "mcpServers": {
     "ambari-api": {
-      "type": "http",
+      "type": "streamable-http",
       "url": "http://host.docker.internal:18001/mcp"
     }
   }
@@ -166,7 +166,7 @@ This MCP server provides the following tools for Ambari cluster management:
 
 ---
 
-## QuickStart (http Mode)
+## QuickStart (transport="streamable-http")
 
 Running OpenWebUI and MCP-Ambari-API with Docker
 
