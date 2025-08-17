@@ -1,6 +1,6 @@
 # MCP Ambari API
 
-[![MSeeP.ai Security Assessment Badge](https://mseep.net/pr/call518-mcp-ambari-api-badge.png)](https://mseep.ai/app/call518-mcp-ambari-api)
+**Benefits**: Automate Ambari operations with a single LLM natural-language line: service control, configuration/status inspection, and request tracking via MCP tools.
 
 [![Verified on MSeeP](https://mseep.ai/badge.svg)](https://mseep.ai/app/2fd522d4-863d-479d-96f7-e24c7fb531db)
 
@@ -170,10 +170,10 @@ This MCP server provides the following tools for Ambari cluster management:
 
 Running OpenWebUI and MCP-Ambari-API with Docker
 
-### Tested Env.
+### Tested Env
 
 - WSL2 Linux on Windows11
-  - `.wslconfig `: tested with `networkingMode = bridged`
+  - `.wslconfig`: tested with `networkingMode = bridged`
 - Ambari-3.0 Cluster
 
 ### 1. Prepare Ambari Cluster (Test Target)
@@ -211,11 +211,11 @@ Startup `OpenWebUI` and `MCPO(MCP to OpenAPI)`, `MCP-Server`
    ```
 
 - OpenWebUI will be available at the port specified in your `docker-compose.yml` (default: 3000 or as configured).
-  - e.g: http://localhost:3000 or as configured.
+  - e.g: <http://localhost:3000> or as configured.
 - The MCPO-Proxy will be accessible for API requests and cluster management, and its port is also specified in your `docker-compose.yml`.
   - e.g: 8000 or as configured.
 - The list of MCP tool features provided by `src/mcp_ambari_api/ambari_api.py` can be found in the MCPO API Docs.
-  - e.g: http://localhost:8000/ambari-api/docs
+  - e.g: <http://localhost:8000/ambari-api/docs>
 ![Example: MCPO-Proxy](img/mcpo-proxy-api-docs.png)
 
 ### 3. Registering the Tool in OpenWebUI
