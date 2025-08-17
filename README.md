@@ -1,10 +1,10 @@
+# MCP Ambari API
+
 [![MSeeP.ai Security Assessment Badge](https://mseep.net/pr/call518-mcp-ambari-api-badge.png)](https://mseep.ai/app/call518-mcp-ambari-api)
 
 [![Verified on MSeeP](https://mseep.ai/badge.svg)](https://mseep.ai/app/2fd522d4-863d-479d-96f7-e24c7fb531db)
 
 [![Deploy to PyPI with tag](https://github.com/call518/MCP-Ambari-API/actions/workflows/pypi-publish.yml/badge.svg)](https://github.com/call518/MCP-Ambari-API/actions/workflows/pypi-publish.yml)
-
-# MCP Ambari API
 
 Model Context Protocol (MCP) server for Apache Ambari API integration. This project provides tools for managing Hadoop clusters, including service operations, configuration management, status monitoring, and request tracking.
 
@@ -19,6 +19,7 @@ Model Context Protocol (MCP) server for Apache Ambari API integration. This proj
 This MCP server supports two connection modes: **stdio** (traditional) and **http** (Docker-based). The transport mode is automatically determined by the `MCP_SERVER_PORT` environment variable.
 
 **Transport Selection Logic:**
+
 - **http mode**: When `MCP_SERVER_PORT` environment variable is set
 - **stdio mode**: When `MCP_SERVER_PORT` environment variable is NOT set
 
@@ -62,17 +63,17 @@ Using this is very simple and straightforward. If you already have an MCP Tools 
 **On MCP-Server Host:**
 
 ```bash
-$ pip install uv
-$ pip install mcp-ambari-api
+pip install uv
+pip install mcp-ambari-api
 
-$ export AMBARI_HOST="host.docker.internal""
-$ export AMBARI_PORT="8080"
-$ export AMBARI_USER="admin"
-$ export AMBARI_PASS="admin"
-$ export AMBARI_CLUSTER_NAME="TEST-AMBARI"
-$ export AMBARI_LOG_LEVEL="INFO"
+export AMBARI_HOST="host.docker.internal""
+export AMBARI_PORT="8080"
+export AMBARI_USER="admin"
+export AMBARI_PASS="admin"
+export AMBARI_CLUSTER_NAME="TEST-AMBARI"
+export AMBARI_LOG_LEVEL="INFO"
 
-$ uvx mcp-ambari-api
+uvx mcp-ambari-api
 ```
 
 **On MCP-Client Host:**
@@ -101,11 +102,13 @@ $ uvx mcp-ambari-api
 This MCP server provides the following tools for Ambari cluster management:
 
 ### Cluster Management
+
 - `get_cluster_info` - Retrieve basic cluster information and status
 - `get_active_requests` - List currently active/running operations
 - `get_request_status` - Check status and progress of specific requests
 
 ### Service Management
+
 - `get_cluster_services` - List all services with their status
 - `get_service_status` - Get detailed status of a specific service
 - `get_service_components` - List components and host assignments for a service
@@ -118,6 +121,7 @@ This MCP server provides the following tools for Ambari cluster management:
 - `restart_all_services` - Restart all services in the cluster
 
 ### Configuration Management
+
 - `dump_configurations` - Unified configuration tool (replaces `get_configurations`, `list_configurations`, and the former internal `dump_all_configurations`). Supports:
   - Single type: `dump_configurations(config_type="yarn-site")`
   - Bulk summary: `dump_configurations(summarize=True)`
@@ -129,10 +133,12 @@ This MCP server provides the following tools for Ambari cluster management:
 > Breaking Change: `get_configurations` and `list_configurations` were removed in favor of this single, more capable tool.
 
 ### Host Management
+
 - `list_hosts` - List all hosts in the cluster
 - `get_host_details` - Get detailed information for specific or all hosts (includes component states, hardware metrics, and service assignments)
 
 ### User Management
+
 - `list_users` - List all users in the Ambari system with their usernames and API links
 - `get_user` - Get detailed information about a specific user including:
   - Basic profile (ID, username, display name, user type)
@@ -141,6 +147,7 @@ This MCP server provides the following tools for Ambari cluster management:
   - Group memberships, privileges, and widget layouts
 
 ### Alert Management
+
 - `get_alerts_history` - **Unified alert tool** for both current and historical alerts:
   - **Current mode** (`mode="current"`): Retrieve current/active alerts with real-time status
     - Current alert states across cluster, services, or hosts
@@ -175,7 +182,7 @@ To set up a Ambari Demo cluster, follow the guide at: [Install Ambari 3.0 with D
 
 ![Example: Ambari Demo Cluster](img/ex-ambari.png)
 
-**Ambari Cluster Configurations**
+#### Ambari Cluster Configurations
 
 ```json
 "PYTHONPATH": "/app/src",
@@ -198,6 +205,7 @@ Startup `OpenWebUI` and `MCPO(MCP to OpenAPI)`, `MCP-Server`
 1. Check and update `docker-compose.yml`.
 1. Check Networking for Host and Docker Containers.
 1. Run:
+
    ```bash
    docker-compose up -d
    ```
@@ -221,9 +229,11 @@ Startup `OpenWebUI` and `MCPO(MCP to OpenAPI)`, `MCP-Server`
 Below is an example screenshot showing how to query the Ambari cluster using MCP Tools in OpenWebUI:
 
 #### Example Query - Cluster Configuration Review & Recommendations
+
 ![Example: Querying Ambari Cluster(2)](img/ex-screenshot-2.png)
 
 #### Example Query - Restart HDFS Service
+
 ![Example: Querying Ambari Cluster(3)](img/ex-screenshot-3-1.png)
 ![Example: Querying Ambari Cluster(3)](img/ex-screenshot-3-2.png)
 
