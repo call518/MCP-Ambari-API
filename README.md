@@ -16,7 +16,7 @@ Model Context Protocol (MCP) server for Apache Ambari API integration. This proj
 
 ## Usages
 
-This MCP server supports two connection modes: **stdio** (traditional) and **http** (Docker-based). The transport mode is automatically determined by the `MCP_SERVER_PORT` environment variable.
+This MCP server supports two connection modes: **stdio** (traditional) and **streamable-http** (Docker-based). The transport mode is automatically determined by the `MCP_SERVER_PORT` environment variable.
 
 **Transport Selection Logic:**
 
