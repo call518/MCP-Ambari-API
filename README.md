@@ -1,6 +1,6 @@
 # MCP Ambari API
 
-**Benefits**: Automate Ambari operations with a single LLM natural-language line: service control, configuration/status inspection, and request tracking via MCP tools.
+> **Benefits**: Automate Ambari operations with a single LLM natural-language line: service control, configuration/status inspection, and request tracking via MCP tools.
 
 [![Verified on MSeeP](https://mseep.ai/badge.svg)](https://mseep.ai/app/2fd522d4-863d-479d-96f7-e24c7fb531db)
 
