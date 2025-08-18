@@ -65,7 +65,7 @@ This MCP server provides tools for managing Hadoop clusters through Apache Ambar
 
 ### Prerequisites
 
-- Python 3.11
+- Python 3.11 (uv vene --python 3.11 --seed)
 - Apache Ambari cluster (3.0+ recommended)
 - UV package manager (or pip)
 
