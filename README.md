@@ -4,10 +4,6 @@
 
 ---
 
-## 🏷️ Tags
-
-`apache-ambari` `hadoop-cluster` `mcp-server` `cluster-automation` `devops-tools` `big-data` `infrastructure-management` `ai-automation` `llm-tools` `python-mcp`
-
 [![Verified on MSeeP](https://mseep.ai/badge.svg)](https://mseep.ai/app/2fd522d4-863d-479d-96f7-e24c7fb531db)
 
 [![Deploy to PyPI with tag](https://github.com/call518/MCP-Ambari-API/actions/workflows/pypi-publish.yml/badge.svg)](https://github.com/call518/MCP-Ambari-API/actions/workflows/pypi-publish.yml)
@@ -29,9 +25,12 @@
 - **User & Host Management**: Manage cluster users, permissions, and host assignments
 - **Request Tracking**: Monitor long-running operations with detailed progress tracking
 
-> This MCP server provides tools for managing Hadoop clusters through Apache Ambari REST API, supporting both local (`stdio`) and remote (`streamable-http`) connection modes for maximum flexibility in deployment scenarios.
-
+### Docuement for Airflow REST-API
 - [Ambari API Documents](https://github.com/apache/ambari/blob/trunk/ambari-server/docs/api/v1/index.md)
+
+## Topics
+
+`apache-ambari` `hadoop-cluster` `mcp-server` `cluster-automation` `devops-tools` `big-data` `infrastructure-management` `ai-automation` `llm-tools` `python-mcp`
 
 ---
 
@@ -43,15 +42,10 @@
 
 ---
 
-## 🚀 QuickStart Guide /w Docker
-
-### Deploy with OpenWebUI + MCP-Ambari-API in minutes
-
-Perfect for production environments, testing, and enterprise deployments. This setup provides a complete AI-powered Hadoop cluster management solution.
-
-### Dev Env
+## Dev Env
 
 - WSL2(networkingMode = bridged) + Docker-Desktop
+  - `.wslconfig`: tested with `networkingMode = bridged`
 - Python 3.11 venv
 
   ```bash
@@ -64,10 +58,14 @@ Perfect for production environments, testing, and enterprise deployments. This s
   pip install -U pip
   ```
 
-### Tested Env
+---
 
-- WSL2 Linux on Windows11
-  - `.wslconfig`: tested with `networkingMode = bridged`
+## 🚀 QuickStart Guide /w Docker
+
+> **Note:** The following instructions assume you are using the `streamable-http` mode for MCP Server.
+
+### Env
+
 - Ambari-3.0 Cluster
 
 ### 1. Prepare Ambari Cluster (Test Target)
@@ -76,15 +74,14 @@ To set up a Ambari Demo cluster, follow the guide at: [Install Ambari 3.0 with D
 
 ![Example: Ambari Demo Cluster](img/ex-ambari.png)
 
-(NOTE) Make sure these values match your Ambari cluster setup.
-
 ### 2. Run Docker-Compose
 
-Startup `OpenWebUI` and `MCPO(MCP to OpenAPI)`, `MCP-Server`
+Start the `MCP-Server`, `MCPO`(MCP-Proxy for OpenAPI), and `OpenWebUI`.
 
 1. Ensure Docker and Docker Compose are installed on your system.
 1. Clone this repository and navigate to its root directory.
-1. Check and update `docker-compose.yml`.
+1. Check `docker-compose.yml` and update.
+1. Check `mcp-config.json.http` and update.
 1. Check Networking for Host and Docker Containers.
 1. Run:
 
@@ -92,12 +89,12 @@ Startup `OpenWebUI` and `MCPO(MCP to OpenAPI)`, `MCP-Server`
    docker-compose up -d
    ```
 
-- OpenWebUI will be available at the port specified in your `docker-compose.yml` (default: 3000 or as configured).
-  - e.g: <http://localhost:3000> or as configured.
+- OpenWebUI will be available at the port specified in your `docker-compose.yml`.
+  - e.g: <http://localhost:3001> or as configured.
 - The MCPO-Proxy will be accessible for API requests and cluster management, and its port is also specified in your `docker-compose.yml`.
-  - e.g: 8000 or as configured.
-- The list of MCP tool features provided by `src/mcp_ambari_api/ambari_api.py` can be found in the MCPO API Docs.
-  - e.g: <http://localhost:8000/ambari-api/docs>
+  - e.g: 8001 or as configured.
+- The list of MCP tool features provided by `swagger` can be found in the MCPO API Docs URL.
+  - e.g: <http://localhost:8001/ambari-api/docs>
 ![Example: MCPO-Proxy](img/mcpo-proxy-api-docs.png)
 
 ### 3. Registering the Tool in OpenWebUI
@@ -139,12 +136,20 @@ This MCP server supports two connection modes: **stdio** (traditional) and **str
 - `FASTMCP_HOST`: Host address for HTTP transport
 - `FASTMCP_PORT`: Port number for HTTP transport (also enables streamable-http mode when set)
 
-**Transport Selection Logic:**
+- `AMBARI_PORT`: Port number for the Ambari server (default: `8080`)
+- `AMBARI_USER`: Username for Ambari server authentication (e.g., "admin")
+- `AMBARI_PASS`: Password for Ambari server authentication (e.g., "admin")
+- `AMBARI_CLUSTER_NAME`: Name of the target Ambari cluster (e.g., "TEST-AMBARI")
+- `AMBARI_LOG_LEVEL`: Logging level for the MCP server (DEBUG, INFO, WARNING, ERROR) 
 
-- **CLI Priority**: `--type streamable-http --host 0.0.0.0 --port 18002`
-- **Environment Priority**: `FASTMCP_TYPE=streamable-http FASTMCP_HOST=0.0.0.0 FASTMCP_PORT=18002`
-- **Legacy Support**: `FASTMCP_PORT=18002` (automatically enables streamable-http mode)
-- **Default**: `stdio` mode when no configuration is provided
+**Transport Selection(Priority) Logic:**
+
+- **CLI Args**: `--type streamable-http --host 0.0.0.0 --port 18002`
+- **Environment Variables**: `FASTMCP_TYPE=streamable-http FASTMCP_HOST=0.0.0.0 FASTMCP_PORT=18002`
+- **Default Values**: `stdio` mode when no configuration is provided
+  - `--type`'s default `stdio`
+  - `--host`'s default `127.0.0.1`
+  - `--port`'s default `8080`
 
 Using this is very simple and straightforward. If you already have an MCP Tools environment running, just add the following configuration to your `mcp-config.json` file:
 
@@ -185,18 +190,12 @@ export AMBARI_LOG_LEVEL="INFO"
 # MCP transport settings (choose one method)
 # Method A: Using environment variables
 export FASTMCP_TYPE="streamable-http"
-export FASTMCP_HOST="127.0.0.1" 
-export FASTMCP_PORT="18001"
+export FASTMCP_HOST="0.0.0.0" 
+export FASTMCP_PORT="8080"
 
 # Method B: Using CLI arguments
 uvx mcp-ambari-api --type streamable-http --host 0.0.0.0 --port 8080
 ```
-
-> **Default values:**  
-> - `--type`: `stdio`  
-> - `--host`: `127.0.0.1`  
-> - `--port`: `8080`  
-> These defaults apply if no CLI arguments or environment variables are provided.
 
 **On MCP-Client Host:**
 
@@ -235,9 +234,8 @@ uvx mcp-ambari-api --type streamable-http --host 0.0.0.0 --port 8080
 
 ### Administration
 
-- **User Management**: Cluster user administration and permission control
+- **User Management**: Check cluster user administration
 - **Host Management**: Node registration, component assignments, and health monitoring
-- **Security**: LDAP integration support and authentication source management
 
 ---
 
@@ -310,33 +308,6 @@ This MCP server provides the following tools for Ambari cluster management:
 
 ---
 
-## 🗺️ Development Roadmap & Features
-
-### ✅ Completed Features
-
-- **Cluster Management**: Complete cluster information, status monitoring, and service management
-- **Service Operations**: Start/stop/restart individual services or entire cluster
-- **Configuration Management**: Unified configuration tools with filtering and bulk operations
-- **Request Tracking**: Real-time monitoring of long-running cluster operations
-- **Host Management**: Comprehensive host and component management
-- **Alert System**: Current and historical alert management with advanced filtering
-- **User Management**: Basic user administration and permission handling
-
-### ⬜ Planned Features (Contributions Welcome!)
-
-- **Advanced User Management**: Enhanced user profiles and bulk operations
-- **Permission System**: Granular permission management and role-based access
-- **View Management**: Custom dashboard and view configuration
-- **Alert Definitions**: Custom alert creation and notification rules
-- **Authentication Sources**: LDAP, Active Directory, and SSO integration
-- **Config Groups**: Advanced configuration group management
-- **Credential Management**: Secure credential storage and rotation
-- **Repository Management**: Stack version and repository management tools
-
-> **Note**: Features are prioritized based on community feedback and enterprise needs. [Submit feature requests](https://github.com/call518/MCP-Ambari-API/issues) or contribute via pull requests!
-
----
-
 ## 🤝 Contributing & Support
 
 ### How to Contribute
@@ -346,15 +317,9 @@ This MCP server provides the following tools for Ambari cluster management:
 - 🔧 **Submit PRs**: [Contributing Guidelines](https://github.com/call518/MCP-Ambari-API/blob/main/CONTRIBUTING.md)
 - 📖 **Improve Docs**: Help make documentation better
 
-### Getting Help
-
-- **Documentation**: Check this README and inline code comments
-- **Community**: GitHub Discussions for questions and best practices
-- **Issues**: Bug reports and technical support via GitHub Issues
-
 ### Technologies Used
 
-- **Language**: Python 3.11+
+- **Language**: Python 3.11
 - **Framework**: Model Context Protocol (MCP)
 - **API**: Apache Ambari REST API
 - **Transport**: stdio (local) and streamable-http (remote)
@@ -366,7 +331,7 @@ This MCP server provides the following tools for Ambari cluster management:
 
 ### Q: What Ambari versions are supported?
 
-**A**: Ambari 3.0+ is recommended. Earlier versions may work but are not officially tested.
+**A**: Ambari 2.7+ is recommended. Earlier versions may work but are not officially tested.
 
 ### Q: Can I use this with cloud-managed Hadoop clusters?
 
@@ -375,10 +340,6 @@ This MCP server provides the following tools for Ambari cluster management:
 ### Q: How do I troubleshoot connection issues?
 
 **A**: Check your `AMBARI_HOST`, `AMBARI_PORT`, and network connectivity. Enable debug logging with `AMBARI_LOG_LEVEL=DEBUG`.
-
-### Q: Is this safe for production use?
-
-**A**: Yes, the tool only uses official Ambari APIs and includes comprehensive error handling and logging.
 
 ### Q: How does this compare to Ambari Web UI?
 
