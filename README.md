@@ -49,6 +49,7 @@ Perfect for production environments, testing, and enterprise deployments. This s
 
 ### Dev Env
 
+- WSL2(networkingMode = bridged) + Docker-Desktop
 - Python 3.11 venv
 
   ```bash
