@@ -188,11 +188,13 @@ export FASTMCP_PORT="18001"
 
 # Method B: Using CLI arguments
 uvx mcp-ambari-api --type streamable-http --host 0.0.0.0 --port 8080
-
-# Method C: Using legacy port-only setting (backward compatibility)
-# export FASTMCP_PORT="18001"
-# uvx mcp-ambari-api
 ```
+
+> **Default values:**  
+> - `--type`: `stdio`  
+> - `--host`: `127.0.0.1`  
+> - `--port`: `8080`  
+> These defaults apply if no CLI arguments or environment variables are provided.
 
 **On MCP-Client Host:**
 
