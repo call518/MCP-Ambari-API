@@ -28,7 +28,8 @@ RUN uv sync
 RUN pip install .
 
 ENV FASTMCP_HOST=0.0.0.0
-ENV MCP_SERVER_PORT=18000
+ENV PORT=18000
+ENV MCP_SERVER_PORT=${PORT}
 EXPOSE ${MCP_SERVER_PORT}
 
 CMD ["python", "-m", "mcp_abmari_api.ambari_api"]
