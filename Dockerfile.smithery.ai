@@ -27,8 +27,10 @@ RUN uv sync
 
 RUN pip install .
 
+ENV PYTHONPATH=/app/src
 ENV FASTMCP_HOST=0.0.0.0
-ENV MCP_SERVER_PORT=18000
-EXPOSE ${MCP_SERVER_PORT}
+ENV FASTMCP_PORT=18000
+EXPOSE ${FASTMCP_PORT}
 
-CMD ["python", "-m", "mcp_abmari_api.ambari_api"]
+# CMD ["python", "-m", "mcp_abmari_api.ambari_api"]
+CMD ["/bin/bash", "/app/scripts/mcp-server-docker-cmd.sh"]
