@@ -29,7 +29,7 @@ RUN pip install .
 
 ENV PYTHONPATH=/app/src
 ENV FASTMCP_HOST=0.0.0.0
-ENV FASTMCP_PORT=18000
+ENV FASTMCP_PORT=18001
 EXPOSE ${FASTMCP_PORT}
 
 # CMD ["python", "-m", "mcp_abmari_api.ambari_api"]

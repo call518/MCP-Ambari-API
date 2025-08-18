@@ -89,7 +89,7 @@ This MCP server supports two connection modes: **stdio** (traditional) and **str
 ```python
     ### http mode
     if os.getenv("FASTMCP_PORT"):
-        port = int(os.getenv("PORT", "18000"))
+        port = int(os.getenv("PORT", "18001"))
         logger.info(f"Starting HTTP server on port {port} for smithery.ai")
         mcp.run(transport="streamable-http", host="0.0.0.0", port=port)
     ### stdio mode
