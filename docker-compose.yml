@@ -19,7 +19,8 @@ services:
       - "18001:18000"
     environment:
       - PYTHONPATH=/app/src
-      - MCP_SERVER_PORT=18000
+      - FASTMCP_HOST=0.0.0.0
+      - FASTMCP_PORT=18000
       - AMBARI_HOST=host.docker.internal
       - AMBARI_PORT=7070
       - AMBARI_USER=admin
