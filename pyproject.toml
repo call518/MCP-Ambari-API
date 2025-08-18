@@ -7,7 +7,7 @@ name = "mcp-ambari-api"
 version = "0.0.0"
 description = "Model Context Protocol (MCP) server for Apache Ambari API integration. Provides comprehensive tools for managing Hadoop clusters including service operations, configuration management, status monitoring, and request tracking."
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 dependencies = [
     "requests>=2.32.4",
     "uvicorn>=0.35.0",
