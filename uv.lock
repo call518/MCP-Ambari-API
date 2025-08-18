@@ -683,16 +683,12 @@ source = { editable = "." }
 dependencies = [
     { name = "aiohttp" },
     { name = "fastmcp" },
-    { name = "requests" },
-    { name = "uvicorn" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "aiohttp", specifier = ">=3.12.15" },
     { name = "fastmcp", specifier = ">=2.11.1" },
-    { name = "requests", specifier = ">=2.32.4" },
-    { name = "uvicorn", specifier = ">=0.35.0" },
 ]
 
 [[package]]
