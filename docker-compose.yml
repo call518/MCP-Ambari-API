@@ -16,11 +16,12 @@ services:
     image: call518/mcp-server-ambari-api:1.0.0
     container_name: mcp-ambari-api-mcp-server
     ports:
-      - "18001:18001" ### (WARNING) Must be same with port number of 'FASTMCP_PORT', 'mcp-config.json' and 'mcp-config.json.http'
+      - "18001:8080" ### (WARNING) Must be same with port number of 'FASTMCP_PORT', 'mcp-config.json' and 'mcp-config.json.http'
     environment:
       - PYTHONPATH=/app/src
+      - FASTMCP_TYPE=streamable-http
       - FASTMCP_HOST=0.0.0.0
-      - FASTMCP_PORT=18001
+      - FASTMCP_PORT=8080
       - AMBARI_HOST=host.docker.internal
       - AMBARI_PORT=7070
       - AMBARI_USER=admin

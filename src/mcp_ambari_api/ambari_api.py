@@ -2116,12 +2116,29 @@ def main(argv: Optional[List[str]] = None):
     Supports optional CLI arguments (e.g. --log-level DEBUG) while remaining
     backward-compatible with stdio launcher expectations.
     """
-    parser = argparse.ArgumentParser(prog="mcp-ambari-api", description="MCP Ambari API Server")
+    parser = argparse.ArgumentParser(prog="mcp-aambari-api", description="MCP Ambari API Server")
     parser.add_argument(
-        "--log-level", "-l",
+        "--log-level",
         dest="log_level",
         help="Logging level override (DEBUG, INFO, WARNING, ERROR, CRITICAL). Overrides AMBARI_LOG_LEVEL env if provided.",
         choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+    )
+    parser.add_argument(
+        "--type",
+        dest="transport_type",
+        help="Transport type (stdio or streamable-http). Default: stdio",
+        choices=["stdio", "streamable-http"],
+    )
+    parser.add_argument(
+        "--host",
+        dest="host",
+        help="Host address for streamable-http transport. Default: 127.0.0.1",
+    )
+    parser.add_argument(
+        "--port",
+        dest="port",
+        type=int,
+        help="Port number for streamable-http transport. Default: 8080",
     )
     # Allow future extension without breaking unknown args usage
     args = parser.parse_args(argv)
@@ -2135,19 +2152,21 @@ def main(argv: Optional[List[str]] = None):
     else:
         logger.debug("Log level from environment: %s", logging.getLogger().level)
 
-    # mcp.run(transport='stdio')
-    # mcp.run(transport='http', host="127.0.0.1", port=18001)
-    # mcp.run(transport="streamable-http", host="127.0.0.1", port=18001)
+    # 우선순위: 실행옵션 > 환경변수 > 기본값
+    # Transport type 결정
+    transport_type = args.transport_type or os.getenv("FASTMCP_TYPE", "stdio")
     
-    # FASTMCP_PORT 환경변수가 있으면 streamable-http, 없으면 stdio
-    if os.getenv("FASTMCP_PORT"):
-        # FASTMCP_PORT 있음 → http transport
-        host = os.getenv("FASTMCP_HOST", "127.0.0.1")
-        port = int(os.getenv("FASTMCP_PORT", "18001"))
-        logger.info(f"Starting HTTP server on {host}:{port} for smithery.ai")
+    # Host 결정
+    host = args.host or os.getenv("FASTMCP_HOST", "127.0.0.1")
+    
+    # Port 결정 (간결하게)
+    port = args.port or int(os.getenv("FASTMCP_PORT", 8080))
+
+    # Transport 모드에 따른 실행
+    if transport_type == "streamable-http":
+        logger.info(f"Starting streamable-http server on {host}:{port}")
         mcp.run(transport="streamable-http", host=host, port=port)
     else:
-        # FASTMCP_PORT 없음 → stdio transport
         logger.info("Starting stdio transport for local usage")
         mcp.run(transport='stdio')
 

@@ -1,6 +1,7 @@
 #!/bin/bash
 
 export PYTHONPATH=${PYTHONPATH}
+export FASTMCP_TYPE=${FASTMCP_TYPE}
 export FASTMCP_HOST=${FASTMCP_HOST}
 export FASTMCP_PORT=${FASTMCP_PORT}
 export AMBARI_HOST=${AMBARI_HOST}
@@ -10,4 +11,4 @@ export AMBARI_PASS=${AMBARI_PASS}
 export AMBARI_CLUSTER_NAME=${AMBARI_CLUSTER_NAME}
 export AMBARI_LOG_LEVEL=${AMBARI_LOG_LEVEL}
 
-python -m mcp_ambari_api.ambari_api
+python -m mcp_ambari_api.ambari_api --type ${FASTMCP_TYPE} --host ${FASTMCP_HOST} --port ${FASTMCP_PORT}
