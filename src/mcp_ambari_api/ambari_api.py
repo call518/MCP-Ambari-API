@@ -2143,14 +2143,20 @@ def main(argv: Optional[List[str]] = None):
     # Allow future extension without breaking unknown args usage
     args = parser.parse_args(argv)
 
+    # Determine log level: CLI arg > environment variable > default
+    log_level = args.log_level or os.getenv("AMBARI_LOG_LEVEL", "INFO")
+    
+    # Set logging level
+    logging.getLogger().setLevel(log_level)
+    logger.setLevel(log_level)
+    logging.getLogger("aiohttp.client").setLevel("WARNING")  # reduce noise at DEBUG
+    
     if args.log_level:
-        # Override root + specific logger level
-        logging.getLogger().setLevel(args.log_level)
-        logger.setLevel(args.log_level)
-        logging.getLogger("aiohttp.client").setLevel("WARNING")  # reduce noise at DEBUG
         logger.info("Log level set via CLI to %s", args.log_level)
+    elif os.getenv("AMBARI_LOG_LEVEL"):
+        logger.info("Log level set via environment variable to %s", log_level)
     else:
-        logger.debug("Log level from environment: %s", logging.getLogger().level)
+        logger.info("Using default log level: %s", log_level)
 
     # 우선순위: 실행옵션 > 환경변수 > 기본값
     # Transport type 결정

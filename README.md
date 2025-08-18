@@ -79,24 +79,28 @@ uvx mcp-ambari-api
 
 ## 🔧 Usage & Configuration
 
-This MCP server supports two connection modes: **stdio** (traditional) and **streamable-http** (Docker-based). The transport mode is automatically determined by the `FASTMCP_PORT` environment variable.
+This MCP server supports two connection modes: **stdio** (traditional) and **streamable-http** (Docker-based). You can configure the transport mode using CLI arguments or environment variables.
+
+**Configuration Priority:** CLI arguments > Environment variables > Default values
+
+### CLI Arguments
+
+- `--type` (`-t`): Transport type (`stdio` or `streamable-http`) - Default: `stdio`
+- `--host`: Host address for HTTP transport - Default: `127.0.0.1`  
+- `--port` (`-p`): Port number for HTTP transport - Default: `8080`
+
+### Environment Variables
+
+- `FASTMCP_TYPE`: Transport type (`stdio` or `streamable-http`)
+- `FASTMCP_HOST`: Host address for HTTP transport
+- `FASTMCP_PORT`: Port number for HTTP transport (also enables streamable-http mode when set)
 
 **Transport Selection Logic:**
 
-- **http mode**: When `FASTMCP_PORT` environment variable is set
-- **stdio mode**: When `FASTMCP_PORT` environment variable is NOT set
-
-```python
-    ### http mode
-    if os.getenv("FASTMCP_PORT"):
-        port = int(os.getenv("PORT", "18001"))
-        logger.info(f"Starting HTTP server on port {port} for smithery.ai")
-        mcp.run(transport="streamable-http", host="0.0.0.0", port=port)
-    ### stdio mode
-    else:
-        logger.info("Starting stdio transport for local usage")
-        mcp.run(transport='stdio')
-```
+- **CLI Priority**: `--type streamable-http --host 0.0.0.0 --port 18002`
+- **Environment Priority**: `FASTMCP_TYPE=streamable-http FASTMCP_HOST=0.0.0.0 FASTMCP_PORT=18002`
+- **Legacy Support**: `FASTMCP_PORT=18002` (automatically enables streamable-http mode)
+- **Default**: `stdio` mode when no configuration is provided
 
 Using this is very simple and straightforward. If you already have an MCP Tools environment running, just add the following configuration to your `mcp-config.json` file:
 
@@ -129,6 +133,7 @@ Using this is very simple and straightforward. If you already have an MCP Tools 
 pip install uv
 pip install mcp-ambari-api
 
+# Ambari connection settings
 export AMBARI_HOST="host.docker.internal"
 export AMBARI_PORT="8080"
 export AMBARI_USER="admin"
@@ -136,7 +141,18 @@ export AMBARI_PASS="admin"
 export AMBARI_CLUSTER_NAME="TEST-AMBARI"
 export AMBARI_LOG_LEVEL="INFO"
 
-uvx mcp-ambari-api
+# MCP transport settings (choose one method)
+# Method A: Using environment variables
+export FASTMCP_TYPE="streamable-http"
+export FASTMCP_HOST="127.0.0.1" 
+export FASTMCP_PORT="18001"
+
+# Method B: Using CLI arguments
+uvx mcp-ambari-api --type streamable-http --host 127.0.0.1 --port 18001
+
+# Method C: Using legacy port-only setting (backward compatibility)
+# export FASTMCP_PORT="18001"
+# uvx mcp-ambari-api
 ```
 
 **On MCP-Client Host:**
@@ -264,18 +280,6 @@ Perfect for production environments, testing, and enterprise deployments. This s
 To set up a Ambari Demo cluster, follow the guide at: [Install Ambari 3.0 with Docker](https://medium.com/@call518/install-ambari-3-0-with-docker-297a8bb108c8)
 
 ![Example: Ambari Demo Cluster](img/ex-ambari.png)
-
-#### Ambari Cluster Configurations
-
-```json
-"PYTHONPATH": "/app/src",
-"AMBARI_HOST": "host.docker.internal",
-"AMBARI_PORT": "8080",
-"AMBARI_USER": "admin",
-"AMBARI_PASS": "admin",
-"AMBARI_CLUSTER_NAME": "TEST-AMBARI",
-"AMBARI_LOG_LEVEL": "INFO"
-```
 
 (NOTE) Make sure these values match your Ambari cluster setup.
 

@@ -71,6 +71,9 @@ Every tool call triggers a real Ambari REST API request. Call tools ONLY when ne
 11. Mentions alert history / past alerts / alert events / alert timeline → get_alerts_history(mode="history") with appropriate filters (state, service, host, time range).
 12. Ambiguous reference ("restart it") → if no prior unambiguous service, ask (or clarify) before calling.
 
+---
+## 5. Smart Time Context for Natural Language Processing
+
 Canonical English prompt template for the Ambari MCP server. Use this file as the primary system/developer prompt to guide tool selection and safety behavior.
 
 ---
@@ -105,8 +108,8 @@ Every tool call triggers a real Ambari REST API request. Call tools ONLY when ne
 | Config introspection (single or bulk) | dump_configurations | Types, keys, values | Use summarize=True for large dumps |
 | User list | list_users | All users with names & links | "users" / "user list" / "who has access" |
 | User details | get_user(user_name) | Profile, permissions, auth sources | Specific user information |
-| Alert history / past alerts | get_alert_history | Historical alert events | Filter by state/service/host/time |
-| Current alerts / alert status | get_current_alerts | Active alert states | Real-time alert monitoring |
+| Current alerts / active alerts / alert status | get_alerts_history(mode="current") | Active alert states | Real-time alert monitoring |
+| Alert history / past alerts / alert events | get_alerts_history(mode="history") | Historical alert events | Filter by state/service/host/time |
 
 ---
 ## 4. Decision Flow
@@ -122,7 +125,7 @@ Every tool call triggers a real Ambari REST API request. Call tools ONLY when ne
 6. Mentions a specific request ID → get_request_status.
 7. Explicit start / stop / restart + service name → corresponding single-service tool.
 8. Phrase includes “all services” + start/stop/restart → bulk operation (warn!).
-9. Ambiguous reference ("restart it") → if no prior unambiguous service, ask (or clarify) before calling.
+12. Ambiguous reference ("restart it") → if no prior unambiguous service, ask (or clarify) before calling.
 
 ---
 ## 5. Smart Time Context for Natural Language Processing
