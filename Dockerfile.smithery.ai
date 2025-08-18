@@ -13,11 +13,11 @@ WORKDIR /app
 COPY . /app
 
 # Fetch git tags and update version
-RUN git fetch --tags origin && \
-    LATEST_TAG=$(git tag | tail -n 1) && \
-    echo "LATEST_TAG='$LATEST_TAG'" && \
-    sed -i "s|^version = \".*\"|version = \"${LATEST_TAG}\"|" pyproject.toml && \
-    rm -rf .git
+# RUN git fetch --tags origin && \
+#     LATEST_TAG=$(git tag | tail -n 1) && \
+#     echo "LATEST_TAG='$LATEST_TAG'" && \
+#     sed -i "s|^version = \".*\"|version = \"${LATEST_TAG}\"|" pyproject.toml && \
+#     rm -rf .git
 
 RUN pip install --no-cache-dir --upgrade wheel
 
