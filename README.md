@@ -2,6 +2,8 @@
 
 > **🚀 Automate Apache Ambari operations with AI/LLM**: Natural language commands for Hadoop cluster management, service control, configuration monitoring, and real-time status tracking via Model Context Protocol (MCP) tools.
 
+---
+
 ## 🏷️ Tags
 
 `apache-ambari` `hadoop-cluster` `mcp-server` `cluster-automation` `devops-tools` `big-data` `infrastructure-management` `ai-automation` `llm-tools` `python-mcp`
@@ -10,9 +12,13 @@
 
 [![Deploy to PyPI with tag](https://github.com/call518/MCP-Ambari-API/actions/workflows/pypi-publish.yml/badge.svg)](https://github.com/call518/MCP-Ambari-API/actions/workflows/pypi-publish.yml)
 
+---
+
 ## 📋 Overview
 
 **MCP Ambari API** is a powerful Model Context Protocol (MCP) server that enables seamless Apache Ambari cluster management through natural language commands. Built for DevOps engineers, data engineers, and system administrators who work with Hadoop ecosystems.
+
+---
 
 ### 🎯 What You Can Do
 
@@ -23,70 +29,80 @@
 - **User & Host Management**: Manage cluster users, permissions, and host assignments
 - **Request Tracking**: Monitor long-running operations with detailed progress tracking
 
-### 🏗️ Architecture
-
-This MCP server provides tools for managing Hadoop clusters through Apache Ambari REST API, supporting both local (`stdio`) and remote (`streamable-http`) connection modes for maximum flexibility in deployment scenarios.
+> This MCP server provides tools for managing Hadoop clusters through Apache Ambari REST API, supporting both local (`stdio`) and remote (`streamable-http`) connection modes for maximum flexibility in deployment scenarios.
 
 - [Ambari API Documents](https://github.com/apache/ambari/blob/trunk/ambari-server/docs/api/v1/index.md)
 
-## 🚀 Use Cases & Benefits
-
-### For DevOps Engineers
-
-- **Incident Response**: Quickly restart failed services during outages
-- **Maintenance Automation**: Schedule and execute maintenance tasks via AI commands
-- **Health Monitoring**: Get real-time cluster status without navigating complex UIs
-
-### For Data Engineers
-
-- **Pipeline Management**: Ensure data processing services are running before job execution
-- **Configuration Tuning**: Easily adjust cluster settings for optimal performance
-- **Troubleshooting**: Quickly identify and resolve service conflicts or issues
-
-### For System Administrators
-
-- **User Management**: Manage cluster access and permissions efficiently
-- **Resource Monitoring**: Track cluster resources and host performance
-- **Alert Management**: Stay informed about critical cluster events
-
-## 💡 Why Choose MCP Ambari API?
-
-- **Natural Language Interface**: No need to remember complex API endpoints
-- **AI/LLM Integration**: Works seamlessly with modern AI tools and workflows  
-- **Dual Transport Support**: Flexible deployment options (local or remote)
-- **Comprehensive Coverage**: 25+ tools covering all major Ambari operations
-- **Production Ready**: Built with error handling, logging, and monitoring
+---
 
 ## Example Query - Cluster Info/Status
 
 ![Example: Querying Ambari Cluster(1)](img/ex-screenshot-1.png)
 
-## ⚡ Quick Installation
+---
 
-### Prerequisites
+## 🚀 QuickStart Guide /w Docker
 
-- UV package manager (or pip)
-- venv for Python 3.11
+### Deploy with OpenWebUI + MCP-Ambari-API in minutes
 
-```bash
-# Option-1: with uv
-uv vene --python 3.11 --seed
+Perfect for production environments, testing, and enterprise deployments. This setup provides a complete AI-powered Hadoop cluster management solution.
 
-# Option-2: with pip
-python3.11 -m venv .venv
-source .venv/bin/activate
-pip install -U pip
-```
+### Tested Env
 
-- Apache Ambari cluster (3.0+ recommended)
+- WSL2 Linux on Windows11
+  - `.wslconfig`: tested with `networkingMode = bridged`
+- Ambari-3.0 Cluster
 
-### Install from PyPI
+### 1. Prepare Ambari Cluster (Test Target)
 
-```bash
-pip install mcp-ambari-api
-# or with uv
-uvx mcp-ambari-api
-```
+To set up a Ambari Demo cluster, follow the guide at: [Install Ambari 3.0 with Docker](https://medium.com/@call518/install-ambari-3-0-with-docker-297a8bb108c8)
+
+![Example: Ambari Demo Cluster](img/ex-ambari.png)
+
+(NOTE) Make sure these values match your Ambari cluster setup.
+
+### 2. Run Docker-Compose
+
+Startup `OpenWebUI` and `MCPO(MCP to OpenAPI)`, `MCP-Server`
+
+1. Ensure Docker and Docker Compose are installed on your system.
+1. Clone this repository and navigate to its root directory.
+1. Check and update `docker-compose.yml`.
+1. Check Networking for Host and Docker Containers.
+1. Run:
+
+   ```bash
+   docker-compose up -d
+   ```
+
+- OpenWebUI will be available at the port specified in your `docker-compose.yml` (default: 3000 or as configured).
+  - e.g: <http://localhost:3000> or as configured.
+- The MCPO-Proxy will be accessible for API requests and cluster management, and its port is also specified in your `docker-compose.yml`.
+  - e.g: 8000 or as configured.
+- The list of MCP tool features provided by `src/mcp_ambari_api/ambari_api.py` can be found in the MCPO API Docs.
+  - e.g: <http://localhost:8000/ambari-api/docs>
+![Example: MCPO-Proxy](img/mcpo-proxy-api-docs.png)
+
+### 3. Registering the Tool in OpenWebUI
+
+1. logging in to OpenWebUI with an admin account
+1. go to "Settings" → "Tools" from the top menu.
+1. Enter the `ambari-api` Tool address (e.g., `http://localhost:8000/ambari-api`) to connect MCP Tools with your Ambari cluster.
+
+### 4. More Examples: Using MCP Tools to Query Ambari Cluster
+
+Below is an example screenshot showing how to query the Ambari cluster using MCP Tools in OpenWebUI:
+
+#### Example Query - Cluster Configuration Review & Recommendations
+
+![Example: Querying Ambari Cluster(2)](img/ex-screenshot-2.png)
+
+#### Example Query - Restart HDFS Service
+
+![Example: Querying Ambari Cluster(3)](img/ex-screenshot-3-1.png)
+![Example: Querying Ambari Cluster(3)](img/ex-screenshot-3-2.png)
+
+---
 
 ## 🔧 Usage & Configuration
 
@@ -179,6 +195,8 @@ uvx mcp-ambari-api --type streamable-http --host 127.0.0.1 --port 18001
 }
 ```
 
+---
+
 ## 🎯 Core Features & Capabilities
 
 ### Service Operations
@@ -204,6 +222,8 @@ uvx mcp-ambari-api --type streamable-http --host 127.0.0.1 --port 18001
 - **User Management**: Cluster user administration and permission control
 - **Host Management**: Node registration, component assignments, and health monitoring
 - **Security**: LDAP integration support and authentication source management
+
+---
 
 ## Available MCP Tools
 
@@ -274,67 +294,6 @@ This MCP server provides the following tools for Ambari cluster management:
 
 ---
 
-## 🚀 Docker QuickStart Guide (Recommended)
-
-### Deploy with OpenWebUI + MCP-Ambari-API in minutes
-
-Perfect for production environments, testing, and enterprise deployments. This setup provides a complete AI-powered Hadoop cluster management solution.
-
-### Tested Env
-
-- WSL2 Linux on Windows11
-  - `.wslconfig`: tested with `networkingMode = bridged`
-- Ambari-3.0 Cluster
-
-### 1. Prepare Ambari Cluster (Test Target)
-
-To set up a Ambari Demo cluster, follow the guide at: [Install Ambari 3.0 with Docker](https://medium.com/@call518/install-ambari-3-0-with-docker-297a8bb108c8)
-
-![Example: Ambari Demo Cluster](img/ex-ambari.png)
-
-(NOTE) Make sure these values match your Ambari cluster setup.
-
-### 2. Run Docker-Compose
-
-Startup `OpenWebUI` and `MCPO(MCP to OpenAPI)`, `MCP-Server`
-
-1. Ensure Docker and Docker Compose are installed on your system.
-1. Clone this repository and navigate to its root directory.
-1. Check and update `docker-compose.yml`.
-1. Check Networking for Host and Docker Containers.
-1. Run:
-
-   ```bash
-   docker-compose up -d
-   ```
-
-- OpenWebUI will be available at the port specified in your `docker-compose.yml` (default: 3000 or as configured).
-  - e.g: <http://localhost:3000> or as configured.
-- The MCPO-Proxy will be accessible for API requests and cluster management, and its port is also specified in your `docker-compose.yml`.
-  - e.g: 8000 or as configured.
-- The list of MCP tool features provided by `src/mcp_ambari_api/ambari_api.py` can be found in the MCPO API Docs.
-  - e.g: <http://localhost:8000/ambari-api/docs>
-![Example: MCPO-Proxy](img/mcpo-proxy-api-docs.png)
-
-### 3. Registering the Tool in OpenWebUI
-
-1. logging in to OpenWebUI with an admin account
-1. go to "Settings" → "Tools" from the top menu.
-1. Enter the `ambari-api` Tool address (e.g., `http://localhost:8000/ambari-api`) to connect MCP Tools with your Ambari cluster.
-
-### 4. More Examples: Using MCP Tools to Query Ambari Cluster
-
-Below is an example screenshot showing how to query the Ambari cluster using MCP Tools in OpenWebUI:
-
-#### Example Query - Cluster Configuration Review & Recommendations
-
-![Example: Querying Ambari Cluster(2)](img/ex-screenshot-2.png)
-
-#### Example Query - Restart HDFS Service
-
-![Example: Querying Ambari Cluster(3)](img/ex-screenshot-3-1.png)
-![Example: Querying Ambari Cluster(3)](img/ex-screenshot-3-2.png)
-
 ## 🗺️ Development Roadmap & Features
 
 ### ✅ Completed Features
@@ -360,6 +319,8 @@ Below is an example screenshot showing how to query the Ambari cluster using MCP
 
 > **Note**: Features are prioritized based on community feedback and enterprise needs. [Submit feature requests](https://github.com/call518/MCP-Ambari-API/issues) or contribute via pull requests!
 
+---
+
 ## 🤝 Contributing & Support
 
 ### How to Contribute
@@ -383,6 +344,8 @@ Below is an example screenshot showing how to query the Ambari cluster using MCP
 - **Transport**: stdio (local) and streamable-http (remote)
 - **Deployment**: Docker, Docker Compose, PyPI
 
+---
+
 ## ❓ Frequently Asked Questions
 
 ### Q: What Ambari versions are supported?
@@ -404,6 +367,8 @@ Below is an example screenshot showing how to query the Ambari cluster using MCP
 ### Q: How does this compare to Ambari Web UI?
 
 **A**: This provides programmatic access via AI/LLM commands, perfect for automation, scripting, and integration with modern DevOps workflows.
+
+---
 
 ## 📄 License
 
