@@ -172,11 +172,8 @@ Using this is very simple and straightforward. If you already have an MCP Tools 
 **On MCP-Server Host:**
 
 ```bash
-pip install uv
-pip install mcp-ambari-api
-
 # Ambari connection settings
-export AMBARI_HOST="host.docker.internal"
+export AMBARI_HOST="127.0.0.1"
 export AMBARI_PORT="8080"
 export AMBARI_USER="admin"
 export AMBARI_PASS="admin"
@@ -190,7 +187,7 @@ export FASTMCP_HOST="127.0.0.1"
 export FASTMCP_PORT="18001"
 
 # Method B: Using CLI arguments
-uvx mcp-ambari-api --type streamable-http --host 127.0.0.1 --port 18001
+uvx mcp-ambari-api --type streamable-http --host 0.0.0.0 --port 8080
 
 # Method C: Using legacy port-only setting (backward compatibility)
 # export FASTMCP_PORT="18001"
@@ -204,7 +201,7 @@ uvx mcp-ambari-api --type streamable-http --host 127.0.0.1 --port 18001
   "mcpServers": {
     "ambari-api": {
       "type": "streamable-http",
-      "url": "http://host.docker.internal:18001/mcp"
+      "url": "http://localhost:8080/mcp"
     }
   }
 }
