@@ -53,7 +53,7 @@ Perfect for production environments, testing, and enterprise deployments. This s
 
   ```bash
   ### Option-1: with uv
-  uv vene --python 3.11 --seed
+  uv venv --python 3.11 --seed
 
   ### Option-2: with pip
   python3.11 -m venv .venv
