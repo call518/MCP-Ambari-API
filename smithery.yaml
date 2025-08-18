@@ -18,8 +18,12 @@ build:
   dockerfile: "Dockerfile.smithery.ai"
   dockerBuildPath: "."
 
+runtime: "container"
+
 startCommand:
-  type: stdio
+  #type: stdio
+  type: http
+  endpoint: /mcp
   # User-supplied configuration schema mapped to environment variables.
   configSchema:
     type: object
@@ -61,25 +65,27 @@ startCommand:
         description: "Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)"
         default: INFO
         secret: false
-  commandFunction: |-
-    (config) => {
-      // Always use the installed console script from PyPI.
-      // (Smithery environment must have already run: pip install mcp-ambari-api[latest|==version])
-      const env = {
-        AMBARI_HOST: config.AMBARI_HOST,
-        AMBARI_PORT: config.AMBARI_PORT,
-        AMBARI_USER: config.AMBARI_USER,
-        AMBARI_PASS: config.AMBARI_PASS,
-        AMBARI_CLUSTER_NAME: config.AMBARI_CLUSTER_NAME,
-        AMBARI_LOG_LEVEL: config.AMBARI_LOG_LEVEL
-      };
-      const args = [];
-      // Also pass as CLI flag for immediate override (env still available inside process)
-      if (config.AMBARI_LOG_LEVEL) {
-        args.push('--log-level', config.AMBARI_LOG_LEVEL);
-      }
-      return { command: 'mcp-ambari-api', args, env };
-    }
+###### Only for stdio mode
+  # commandFunction: |-
+  #   (config) => {
+  #     // Always use the installed console script from PyPI.
+  #     // (Smithery environment must have already run: pip install mcp-ambari-api[latest|==version])
+  #     const env = {
+  #       AMBARI_HOST: config.AMBARI_HOST,
+  #       AMBARI_PORT: config.AMBARI_PORT,
+  #       AMBARI_USER: config.AMBARI_USER,
+  #       AMBARI_PASS: config.AMBARI_PASS,
+  #       AMBARI_CLUSTER_NAME: config.AMBARI_CLUSTER_NAME,
+  #       AMBARI_LOG_LEVEL: config.AMBARI_LOG_LEVEL
+  #     };
+  #     const args = [];
+  #     // Also pass as CLI flag for immediate override (env still available inside process)
+  #     if (config.AMBARI_LOG_LEVEL) {
+  #       args.push('--log-level', config.AMBARI_LOG_LEVEL);
+  #     }
+  #     return { command: 'mcp-ambari-api', args, env };
+  #   }
+######
   exampleConfig:
     AMBARI_HOST: host.docker.internal
     AMBARI_PORT: "8080"
