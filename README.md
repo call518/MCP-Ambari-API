@@ -47,6 +47,20 @@
 
 Perfect for production environments, testing, and enterprise deployments. This setup provides a complete AI-powered Hadoop cluster management solution.
 
+### Dev Env
+
+- Python 3.11 venv
+
+  ```bash
+  ### Option-1: with uv
+  uv vene --python 3.11 --seed
+
+  ### Option-2: with pip
+  python3.11 -m venv .venv
+  source .venv/bin/activate
+  pip install -U pip
+  ```
+
 ### Tested Env
 
 - WSL2 Linux on Windows11
