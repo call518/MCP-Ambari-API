@@ -39,7 +39,7 @@
 
 ![Example: Querying Ambari Cluster(1)](img/ex-screenshot-1.png)
 
-### More Queries
+### More Example Queries
 
 **[Go to More Example Queries](./src/mcp_ambari_api/prompt_template.md#5-example-queries)**
 
