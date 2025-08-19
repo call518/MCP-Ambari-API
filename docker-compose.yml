@@ -10,7 +10,7 @@ services:
       - open-webui-data:/app/backend/data
     extra_hosts:
       - "host.docker.internal:host-gateway"
-    restart: always
+    restart: unless-stopped
 
   mcp-server:
     image: call518/mcp-server-ambari-api:1.0.0
@@ -31,7 +31,7 @@ services:
     volumes:
       - ./src:/app/src/
       - ./scripts:/app/scripts
-    restart: always
+    restart: unless-stopped
 
   mcpo-proxy:
     image: call518/mcpo-proxy-ambari-api:1.0.2
@@ -43,7 +43,7 @@ services:
     volumes:
       - ./mcp-config.json.http:/app/config/mcp-config.json
       - ./src:/app/src
-    restart: always
+    restart: unless-stopped
 
 volumes:
   open-webui-data:
