@@ -204,7 +204,127 @@ Any suggestion to check elsewhere manually instead of using the API tools.
    2. LLM calculates "10년 전 이맘때" (around this time 10 years ago) and makes second call
 
 ---
-## 9. Out-of-Scope Handling
+## 9. Example Queries
+
+### 🔍 Cluster & Service Management
+
+**get_cluster_info**
+- "Show cluster summary and basic information."
+- "What's the cluster name and version?"
+- "Display cluster overview with service counts."
+
+**get_cluster_services**
+- "Show all cluster services and their current status."
+- "List all services with their states."
+- "Display service overview for the cluster."
+- "Which services are running in the cluster?"
+
+**get_service_status**
+- "What's the status of HDFS service?"
+- "Check if YARN is running properly."
+- "Show current state of HBase service."
+- "Is the MapReduce service healthy?"
+
+**get_service_components**
+- "Show HDFS components and which hosts they're running on."
+- "List all YARN components with their host assignments."
+- "Display component distribution for Kafka service."
+- "Which hosts are running NameNode components?"
+
+**get_service_details**
+- "Get detailed information about HDFS service including all components."
+- "Show comprehensive YARN service overview with component states."
+- "Display full service details for Spark with host assignments."
+
+### ⚙️ Service Operations
+
+**start_service / stop_service / restart_service**
+- "Start the HDFS service."
+- "Stop the MapReduce service."
+- "Restart the YARN service."
+- "Please restart the HBase service."
+
+**start_all_services / stop_all_services / restart_all_services**
+- "Start all cluster services."
+- "Stop all services in the cluster."
+- "Restart all cluster services."
+- ⚠️ **Warning**: These are bulk operations that affect the entire cluster.
+
+### 📊 Operations & Monitoring
+
+**get_active_requests**
+- "Show all running operations."
+- "List current service requests in progress."
+- "What operations are currently active?"
+- "Display ongoing cluster operations."
+
+**get_request_status**
+- "Check the status of request ID 123."
+- "Show progress for operation 456."
+- "Get details for the last restart request."
+- "Monitor request 789 completion status."
+
+### 🖥️ Host Management
+
+**list_hosts**
+- "List all hosts in the cluster."
+- "Show cluster node inventory."
+- "Display all available hosts."
+
+**get_host_details**
+- "Show detailed information for host node1.example.com."
+- "Get component status on host node2.example.com."
+- "Display all host details with component states."
+- "Show hardware and component information for specific host."
+- 💡 **Tip**: Omit hostname to get details for all hosts.
+
+### 🔧 Configuration Management
+
+**dump_configurations**
+- "Show all configuration types available."
+- "Display HDFS configuration settings."
+- "Get YARN resource manager configuration."
+- "Show core-site.xml configuration values."
+- "Find all configurations containing 'memory' settings."
+- "Display summarized view of all service configurations."
+
+### 👥 User Management
+
+**list_users**
+- "Show all cluster users."
+- "List users with access to Ambari."
+- "Display user accounts and their roles."
+
+**get_user**
+- "Get detailed information for user 'admin'."
+- "Show profile and permissions for user 'operator'."
+- "Display authentication details for specific user."
+
+### 🚨 Alert Management
+
+**get_alerts_history (current mode)**
+- "Show current active alerts."
+- "Display all current alert states."
+- "List active alerts for HDFS service."
+- "Show critical alerts that are currently active."
+
+**get_alerts_history (history mode)**
+- "Show alert history for the last 24 hours."
+- "Display HDFS alerts from yesterday."
+- "Get critical alerts from last week."
+- "Show all alerts that occurred in the past month."
+- "Find alerts for specific host from last 7 days."
+- 💡 **Smart Time Processing**: Supports natural language time expressions in any language.
+
+### 📚 System Information
+
+**get_prompt_template**
+- "Show available prompt template sections."
+- "Get tool usage guidelines."
+- "Display example queries for reference."
+
+---
+## 10. Out-of-Scope Handling
 | Type | Guidance |
 |------|----------|
 | Hadoop theory / tuning | Explain scope limited to real-time Ambari queries & actions; invite a concrete status request |
@@ -212,19 +332,19 @@ Any suggestion to check elsewhere manually instead of using the API tools.
 | Data deletion / installs | Not supported by current tool set; list available tools instead |
 
 ---
-## 10. Safety Phrases
+## 11. Safety Phrases
 On bulk / disruptive operations always append:
 "Caution: Live cluster state will change. Proceeding based on explicit user intent."
 
 ---
-## 11. Sample Multi-step Strategy
+## 12. Sample Multi-step Strategy
 Query: "Restart HDFS and show progress"
 1. restart_service("HDFS") → capture Request ID.
 2. (Optional) Short delay then get_request_status(request_id) once.
 3. Answer: restart triggered + current progress + how to monitor further.
 
 ---
-## 12. Meta
+## 13. Meta
 Keep this template updated when new tools are added (update Sections 3 & 4). Can be delivered via the get_prompt_template MCP tool.
 
 ---

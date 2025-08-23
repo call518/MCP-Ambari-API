@@ -12,6 +12,9 @@ wheels/
 **/__pycache__/
 **/.pytest_cache/
 
+# Environment files
+.env
+
 .vscode*
 #.github/copilot-instructions.md
 

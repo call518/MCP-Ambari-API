@@ -1,17 +1,24 @@
 #!/bin/bash
 set -euo pipefail
 
-# (NOTE) 로컬 개발 소스로 기동됨 (uv run 사용).
-
-# 현재 스크립트 위치로 이동하여 올바른 작업 디렉토리 설정
+# Run MCP Inspector with local source using uv
 cd "$(dirname "$0")"
 
+echo "🔍 Starting MCP Inspector with Ambari Operations server..."
+echo "📁 Working directory: $(pwd)"
+
+# Load environment variables if .env exists
+if [ -f ".env" ]; then
+    echo "📄 Loading environment from .env file"
+    export $(cat .env | grep -v '^#' | xargs)
+fi
+
+# Set default log level for development
+export MCP_LOG_LEVEL=${MCP_LOG_LEVEL:-INFO}
+
+echo "🚀 Launching MCP Inspector..."
+echo "   Log Level: $MCP_LOG_LEVEL"
+echo "   Ambari Host: ${AMBARI_HOST:-localhost}:${AMBARI_PORT:-8080}"
+
 npx -y @modelcontextprotocol/inspector \
-	-e AMBARI_HOST='127.0.0.1' \
-	-e AMBARI_PORT=8080 \
-	-e AMBARI_USER='admin' \
-	-e AMBARI_PASS='admin' \
-	-e AMBARI_CLUSTER_NAME='TEST-AMBARI' \
-	-e AMBARI_LOG_LEVEL='INFO' \
-	-e PYTHONPATH='./src' \
-	-- uv run python -m mcp_ambari_api.ambari_api
+  -- uv run python -m mcp_ambari_api.ambari_api

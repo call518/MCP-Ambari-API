@@ -3,7 +3,7 @@ services:
     image: ghcr.io/open-webui/open-webui:main
     container_name: mcp-ambari-api-open-webui
     ports:
-      - "3001:8080"
+      - "${DOCKER_EXTERNAL_PORT_OPENWEBUI}:8080"
     environment:
       - OLLAMA_BASE_URL=http://host.docker.internal:11434
     volumes:
@@ -13,33 +13,34 @@ services:
     restart: unless-stopped
 
   mcp-server:
-    image: call518/mcp-server-ambari-api:1.0.0
+    image: call518/mcp-server-ambari-api:${MCP_SERVER_IMAGE_VERSION}
     container_name: mcp-ambari-api-mcp-server
     ports:
-      - "18001:8080" ### (WARNING) Must be same with port number of 'FASTMCP_PORT', 'mcp-config.json' and 'mcp-config.json.http'
+      - "${DOCKER_EXTERNAL_PORT_MCP_SERVER}:8080" ### (WARNING) Must be same with port number of 'FASTMCP_PORT', 'mcp-config.json' and 'mcp-config.json.http'
     environment:
-      - PYTHONPATH=/app/src
-      - FASTMCP_TYPE=streamable-http
-      - FASTMCP_HOST=0.0.0.0
-      - FASTMCP_PORT=8080
-      - AMBARI_HOST=host.docker.internal
-      - AMBARI_PORT=7070
-      - AMBARI_USER=admin
-      - AMBARI_PASS=changeme!@34
-      - AMBARI_CLUSTER_NAME=TEST-AMBARI
-      - AMBARI_LOG_LEVEL=INFO
+      - PYTHONPATH=${PYTHONPATH}
+      - FASTMCP_TYPE=${FASTMCP_TYPE}
+      - FASTMCP_HOST=${FASTMCP_HOST}
+      - FASTMCP_PORT=${FASTMCP_PORT}
+      - AMBARI_HOST=${AMBARI_HOST}
+      - AMBARI_PORT=${AMBARI_PORT}
+      - AMBARI_USER=${AMBARI_USER}
+      - AMBARI_PASS=${AMBARI_PASS}
+      - AMBARI_CLUSTER_NAME=${AMBARI_CLUSTER_NAME}
+      - AMBARI_LOG_LEVEL=${AMBARI_LOG_LEVEL}
     volumes:
       - ./src:/app/src/
       - ./scripts:/app/scripts
+      - ./.env:/app/.env:ro
     restart: unless-stopped
 
   mcpo-proxy:
-    image: call518/mcpo-proxy-ambari-api:1.0.2
+    image: call518/mcpo-proxy-ambari-api:${MCPO_PROXY_IMAGE_VERSION}
     container_name: mcp-ambari-api-mcpo-proxy
     depends_on:
       - mcp-server
     ports:
-      - "8001:8000"
+      - "${DOCKER_EXTERNAL_PORT_MCPO_PROXY}:8000"
     volumes:
       - ./mcp-config.json.http:/app/config/mcp-config.json
       - ./src:/app/src

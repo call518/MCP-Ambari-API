@@ -80,21 +80,29 @@ Start the `MCP-Server`, `MCPO`(MCP-Proxy for OpenAPI), and `OpenWebUI`.
 
 1. Ensure Docker and Docker Compose are installed on your system.
 1. Clone this repository and navigate to its root directory.
-1. Check `docker-compose.yml` and update.
-1. Check `mcp-config.json.http` and update.
-1. Check Networking for Host and Docker Containers.
+1. **Set up environment configuration:**
+   ```bash
+   # Copy environment template and configure your settings
+   cp .env.example .env
+   # Edit .env with your Ambari cluster information
+   ```
+1. **Configure your Ambari connection in `.env` file:**
+   ```bash
+   AMBARI_HOST=your-ambari-host
+   AMBARI_PORT=your-ambari-port
+   AMBARI_USER=your-username  
+   AMBARI_PASS=your-password
+   AMBARI_CLUSTER_NAME=your-cluster-name
+   ```
 1. Run:
-
    ```bash
    docker-compose up -d
    ```
 
-- OpenWebUI will be available at the port specified in your `docker-compose.yml`.
-  - e.g: <http://localhost:3001> or as configured.
-- The MCPO-Proxy will be accessible for API requests and cluster management, and its port is also specified in your `docker-compose.yml`.
-  - e.g: 8001 or as configured.
-- The list of MCP tool features provided by `swagger` can be found in the MCPO API Docs URL.
-  - e.g: <http://localhost:8001/ambari-api/docs>
+- OpenWebUI will be available at: `http://localhost:${DOCKER_EXTERNAL_PORT_OPENWEBUI}` (default: 3001)
+- The MCPO-Proxy will be accessible at: `http://localhost:${DOCKER_EXTERNAL_PORT_MCPO_PROXY}` (default: 8001)  
+- The MCPO API Docs: `http://localhost:${DOCKER_EXTERNAL_PORT_MCPO_PROXY}/ambari-api/docs`
+
 ![Example: MCPO-Proxy](img/mcpo-proxy-api-docs.png)
 
 ### 3. Registering the Tool in OpenWebUI
@@ -118,7 +126,147 @@ Below is an example screenshot showing how to query the Ambari cluster using MCP
 
 ---
 
-## 🔧 Usage & Configuration
+## 💡 Tool Example Queries
+
+### 🔍 Cluster & Service Management
+
+**get_cluster_info**
+- "Show cluster summary and basic information."
+- "What's the cluster name and version?"
+- "Display cluster overview with service counts."
+- 📋 **Features**: Cluster name, version, service counts, basic cluster information
+
+**get_cluster_services**
+- "Show all cluster services and their current status."
+- "List all services with their states."
+- "Display service overview for the cluster."
+- "Which services are running in the cluster?"
+- 📋 **Features**: Service names, states, health status overview
+
+**get_service_status**
+- "What's the status of HDFS service?"
+- "Check if YARN is running properly."
+- "Show current state of HBase service."
+- "Is the MapReduce service healthy?"
+- 📋 **Features**: Individual service state, health check, status details
+
+**get_service_components**
+- "Show HDFS components and which hosts they're running on."
+- "List all YARN components with their host assignments."
+- "Display component distribution for Kafka service."
+- "Which hosts are running NameNode components?"
+- 📋 **Features**: Component-to-host mapping, service distribution analysis
+
+**get_service_details**
+- "Get detailed information about HDFS service including all components."
+- "Show comprehensive YARN service overview with component states."
+- "Display full service details for Spark with host assignments."
+- 📋 **Features**: Complete service overview with components and host details
+
+### ⚙️ Service Operations
+
+**start_service / stop_service / restart_service**
+- "Start the HDFS service."
+- "Stop the MapReduce service."
+- "Restart the YARN service."
+- "Please restart the HBase service."
+- 📋 **Features**: Individual service lifecycle management
+- ⚠️ **Note**: Returns request ID for operation tracking
+
+**start_all_services / stop_all_services / restart_all_services**
+- "Start all cluster services."
+- "Stop all services in the cluster."
+- "Restart all cluster services."
+- 📋 **Features**: Bulk service operations for entire cluster
+- ⚠️ **Warning**: These are high-impact operations affecting the entire cluster
+
+### 📊 Operations & Monitoring
+
+**get_active_requests**
+- "Show all running operations."
+- "List current service requests in progress."
+- "What operations are currently active?"
+- "Display ongoing cluster operations."
+- 📋 **Features**: Real-time operation status, request monitoring
+
+**get_request_status**
+- "Check the status of request ID 123."
+- "Show progress for operation 456."
+- "Get details for the last restart request."
+- "Monitor request 789 completion status."
+- 📋 **Features**: Detailed request progress, completion status, error tracking
+
+### 🖥️ Host Management
+
+**list_hosts**
+- "List all hosts in the cluster."
+- "Show cluster node inventory."
+- "Display all available hosts."
+- 📋 **Features**: Host inventory, cluster node overview
+
+**get_host_details**
+- "Show detailed information for host node1.example.com."
+- "Get component status on host node2.example.com."
+- "Display all host details with component states."
+- "Show hardware and component information for specific host."
+- 📋 **Features**: Hardware specs, component states, host health status
+- 💡 **Tip**: Omit hostname parameter to get details for all hosts
+
+### 🔧 Configuration Management
+
+**dump_configurations**
+- "Show all configuration types available."
+- "Display HDFS configuration settings."
+- "Get YARN resource manager configuration."
+- "Show core-site.xml configuration values."
+- "Find all configurations containing 'memory' settings."
+- "Display summarized view of all service configurations."
+- 📋 **Features**: Configuration type exploration, property search, service-specific configs
+- 💡 **Usage**: Use `summarize=True` for overview, `filter` parameter for specific properties
+
+### 👥 User Management
+
+**list_users**
+- "Show all cluster users."
+- "List users with access to Ambari."
+- "Display user accounts and their roles."
+- 📋 **Features**: User accounts, role assignments, access permissions
+
+**get_user**
+- "Get detailed information for user 'admin'."
+- "Show profile and permissions for user 'operator'."
+- "Display authentication details for specific user."
+- 📋 **Features**: User profile, permissions, authentication source, role details
+
+### 🚨 Alert Management
+
+**get_alerts_history (current mode)**
+- "Show current active alerts."
+- "Display all current alert states."
+- "List active alerts for HDFS service."
+- "Show critical alerts that are currently active."
+- 📋 **Features**: Real-time alert monitoring, service-specific alerts, severity filtering
+
+**get_alerts_history (history mode)**
+- "Show alert history for the last 24 hours."
+- "Display HDFS alerts from yesterday."
+- "Get critical alerts from last week."
+- "Show all alerts that occurred in the past month."
+- "Find alerts for specific host from last 7 days."
+- 📋 **Features**: Historical alert analysis, time-based filtering, trend analysis
+- 💡 **Smart Time Processing**: Supports natural language time expressions in any language
+
+### 📚 System Information
+
+**get_prompt_template**
+- "Show available prompt template sections."
+- "Get tool usage guidelines."
+- "Display example queries for reference."
+- 📋 **Features**: Template documentation, usage guidelines, section navigation
+
+---
+
+## 🐛 Usage & Configuration
 
 This MCP server supports two connection modes: **stdio** (traditional) and **streamable-http** (Docker-based). You can configure the transport mode using CLI arguments or environment variables.
 
@@ -132,26 +280,55 @@ This MCP server supports two connection modes: **stdio** (traditional) and **str
 
 ### Environment Variables
 
-- `FASTMCP_TYPE`: Transport type (`stdio` or `streamable-http`)
-- `FASTMCP_HOST`: Host address for HTTP transport
-- `FASTMCP_PORT`: Port number for HTTP transport (also enables streamable-http mode when set)
+| Variable | Description | Default | Project Default |
+|----------|-------------|---------|-----------------|
+| `PYTHONPATH` | Python module search path for MCP server imports | - | `/app/src` |
+| `MCP_LOG_LEVEL` | Server logging verbosity (DEBUG, INFO, WARNING, ERROR) | `INFO` | `INFO` |
+| `FASTMCP_TYPE` | MCP transport protocol (stdio for CLI, streamable-http for web) | `stdio` | `streamable-http` |
+| `FASTMCP_HOST` | HTTP server bind address (0.0.0.0 for all interfaces) | `127.0.0.1` | `0.0.0.0` |
+| `FASTMCP_PORT` | HTTP server port for MCP communication | `8080` | `8080` |
+| `AMBARI_HOST` | Ambari server hostname or IP address | `127.0.0.1` | `host.docker.internal` |
+| `AMBARI_PORT` | Ambari server port number | `8080` | `8080` |
+| `AMBARI_USER` | Username for Ambari server authentication | `admin` | `admin` |
+| `AMBARI_PASS` | Password for Ambari server authentication | `changeme!@34` | `admin` |
+| `AMBARI_CLUSTER_NAME` | Name of the target Ambari cluster | `TEST-AMBARI` | `TEST-AMBARI` |
+| `AMBARI_LOG_LEVEL` | Logging level for the MCP server (DEBUG, INFO, WARNING, ERROR) | `INFO` | `INFO` |
+| `DOCKER_EXTERNAL_PORT_OPENWEBUI` | Host port mapping for Open WebUI container | `8080` | `3001` |
+| `DOCKER_EXTERNAL_PORT_MCP_SERVER` | Host port mapping for MCP server container | `8080` | `18001` |
+| `DOCKER_EXTERNAL_PORT_MCPO_PROXY` | Host port mapping for MCPO proxy container | `8000` | `8001` |
+| `MCP_SERVER_IMAGE_VERSION` | Docker image version for MCP server | `latest` | `1.0.0` |
+| `MCPO_PROXY_IMAGE_VERSION` | Docker image version for MCPO proxy | `latest` | `1.0.2` |
 
-- `AMBARI_PORT`: Port number for the Ambari server (default: `8080`)
-- `AMBARI_USER`: Username for Ambari server authentication (e.g., "admin")
-- `AMBARI_PASS`: Password for Ambari server authentication (e.g., "admin")
-- `AMBARI_CLUSTER_NAME`: Name of the target Ambari cluster (e.g., "TEST-AMBARI")
-- `AMBARI_LOG_LEVEL`: Logging level for the MCP server (DEBUG, INFO, WARNING, ERROR) 
+**Note**: `AMBARI_CLUSTER_NAME` serves as the default target cluster for operations when no specific cluster is specified. All environment variables can be configured via the `.env` file. 
 
-**Transport Selection(Priority) Logic:**
+**Transport Selection Logic:**
 
-- **CLI Args**: `--type streamable-http --host 0.0.0.0 --port 18002`
-- **Environment Variables**: `FASTMCP_TYPE=streamable-http FASTMCP_HOST=0.0.0.0 FASTMCP_PORT=18002`
-- **Default Values**: `stdio` mode when no configuration is provided
-  - `--type`'s default `stdio`
-  - `--host`'s default `127.0.0.1`
-  - `--port`'s default `8080`
+**Configuration Priority:** CLI arguments > Environment variables > Default values
 
-Using this is very simple and straightforward. If you already have an MCP Tools environment running, just add the following configuration to your `mcp-config.json` file:
+**Transport Selection Logic:**
+
+- **CLI Priority**: `--type streamable-http --host 0.0.0.0 --port 18001`
+- **Environment Priority**: `FASTMCP_TYPE=streamable-http FASTMCP_HOST=0.0.0.0 FASTMCP_PORT=18001`
+- **Legacy Support**: `FASTMCP_PORT=18001` (automatically enables streamable-http mode)
+- **Default**: `stdio` mode when no configuration is provided
+
+### Environment Setup
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/call518/MCP-Ambari-API.git
+cd MCP-Ambari-API
+
+# 2. Set up environment configuration
+cp .env.example .env
+
+# 3. Configure your Ambari connection in .env file
+AMBARI_HOST=your-ambari-host
+AMBARI_PORT=your-ambari-port  
+AMBARI_USER=your-username
+AMBARI_PASS=your-password
+AMBARI_CLUSTER_NAME=your-cluster-name
+```
 
 ### Method 1: Local MCP (transport="stdio")
 
@@ -176,26 +353,20 @@ Using this is very simple and straightforward. If you already have an MCP Tools 
 
 ### Method 2: Remote MCP (transport="streamable-http")
 
-**On MCP-Server Host:**
+**On MCP-Client Host:**
 
-```bash
-# Ambari connection settings
-export AMBARI_HOST="127.0.0.1"
-export AMBARI_PORT="8080"
-export AMBARI_USER="admin"
-export AMBARI_PASS="admin"
-export AMBARI_CLUSTER_NAME="TEST-AMBARI"
-export AMBARI_LOG_LEVEL="INFO"
-
-# MCP transport settings (choose one method)
-# Method A: Using environment variables
-export FASTMCP_TYPE="streamable-http"
-export FASTMCP_HOST="0.0.0.0" 
-export FASTMCP_PORT="8080"
-
-# Method B: Using CLI arguments
-uvx mcp-ambari-api --type streamable-http --host 0.0.0.0 --port 8080
+```json
+{
+  "mcpServers": {
+    "ambari-api": {
+      "type": "streamable-http",
+      "url": "http://localhost:18001/mcp"
+    }
+  }
+}
 ```
+
+---
 
 **On MCP-Client Host:**
 

@@ -1,14 +1,25 @@
 #!/bin/bash
+set -euo pipefail
 
-export PYTHONPATH=${PYTHONPATH}
-export FASTMCP_TYPE=${FASTMCP_TYPE}
-export FASTMCP_HOST=${FASTMCP_HOST}
-export FASTMCP_PORT=${FASTMCP_PORT}
-export AMBARI_HOST=${AMBARI_HOST}
-export AMBARI_PORT=${AMBARI_PORT}
-export AMBARI_USER=${AMBARI_USER}
-export AMBARI_PASS=${AMBARI_PASS}
-export AMBARI_CLUSTER_NAME=${AMBARI_CLUSTER_NAME}
-export AMBARI_LOG_LEVEL=${AMBARI_LOG_LEVEL}
+# 어디서 실행하든지, 스크립트 위치의 상위 경로에 있는 .env 파일 export 로드
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd -P)"
+env_file="${script_dir%/*}/.env"
+if [[ -f "$env_file" ]]; then
+  set -o allexport
+  . "$env_file"
+  set +o allexport
+else
+  echo "error: .env not found: $env_file" >&2
+  return 1 2>/dev/null || exit 1
+fi
+
+echo "Starting MCP server with:"
+echo "  PYTHONPATH: ${PYTHONPATH}"
+echo "  FASTMCP_TYPE: ${FASTMCP_TYPE}"
+echo "  FASTMCP_HOST: ${FASTMCP_HOST}"
+echo "  FASTMCP_PORT: ${FASTMCP_PORT}"
+echo "  MCP_LOG_LEVEL: ${MCP_LOG_LEVEL}"
+echo "  AMBARI_HOST: ${AMBARI_HOST}"
+echo "  AMBARI_PORT: ${AMBARI_PORT}"
 
 python -m mcp_ambari_api.ambari_api --type ${FASTMCP_TYPE} --host ${FASTMCP_HOST} --port ${FASTMCP_PORT}
