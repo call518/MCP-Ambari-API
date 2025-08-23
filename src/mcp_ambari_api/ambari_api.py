@@ -48,6 +48,54 @@ mcp = FastMCP("ambari-api")
 # Constants
 # =============================================================================
 
+# =============================================================================
+# Helper Functions
+# =============================================================================
+
+async def check_service_active_requests(cluster_name: str, service_name: str) -> List[Dict]:
+    """
+    Check if there are any active requests for a specific service.
+    
+    Args:
+        cluster_name: Name of the cluster
+        service_name: Name of the service to check
+        
+    Returns:
+        List of active request information dictionaries for the service
+    """
+    try:
+        endpoint = f"/clusters/{cluster_name}/requests?fields=Requests/id,Requests/request_status,Requests/request_context,Requests/start_time,Requests/progress_percent"
+        response_data = await make_ambari_request(endpoint)
+        
+        if response_data is None or response_data.get("error"):
+            return []
+            
+        all_requests = response_data.get("items", [])
+        service_requests = []
+        
+        for request in all_requests:
+            request_info = request.get("Requests", {})
+            status = request_info.get("request_status", "")
+            context = request_info.get("request_context", "")
+            
+            # Check if this is an active request for our service
+            if (status in ["IN_PROGRESS", "PENDING", "QUEUED", "STARTED"] and 
+                service_name.upper() in context.upper()):
+                service_requests.append({
+                    "id": request_info.get("id"),
+                    "status": status,
+                    "context": context,
+                    "progress": request_info.get("progress_percent", 0)
+                })
+                
+        return service_requests
+    except Exception:
+        return []
+
+# =============================================================================
+# MCP Tools
+# =============================================================================
+
 
 @mcp.tool(title="Dump Configurations")
 @log_tool
@@ -843,12 +891,20 @@ async def start_service(service_name: str) -> str:
     """
     cluster_name = AMBARI_CLUSTER_NAME
     try:
-        # Check if service exists
+        # Check if service exists and get current status
         service_endpoint = f"/clusters/{cluster_name}/services/{service_name}"
         service_check = await make_ambari_request(service_endpoint)
         
-        if service_check.get("error"):
+        if service_check is None or service_check.get("error"):
             return f"Error: Service '{service_name}' not found in cluster '{cluster_name}'."
+        
+        # Check current service state
+        service_info = service_check.get("ServiceInfo", {})
+        current_state = service_info.get("state", "UNKNOWN")
+        
+        # If service is already started, return appropriate message
+        if current_state == "STARTED":
+            return f"Service '{service_name}' is already running (state: {current_state}). No action needed."
         
         # Start the service
         payload = {
@@ -864,11 +920,16 @@ async def start_service(service_name: str) -> str:
         
         response_data = await make_ambari_request(service_endpoint, method="PUT", data=payload)
         
-        if response_data.get("error"):
-            return f"Error: Failed to start service '{service_name}' in cluster '{cluster_name}'."
+        if response_data is None or response_data.get("error"):
+            error_msg = response_data.get("error") if response_data else "Unknown error occurred"
+            return f"Error: Failed to start service '{service_name}' - {error_msg}"
         
-        # Extract request information
-        request_info = response_data.get("Requests", {})
+        # Extract request information safely
+        request_info = response_data.get("Requests")
+        if request_info is None:
+            # If no Requests field, but no error, the service might have started immediately
+            return f"Service '{service_name}' start command sent successfully. Previous state: {current_state}"
+        
         request_id = request_info.get("id", "Unknown")
         request_status = request_info.get("status", "Unknown")
         request_href = response_data.get("href", "")
@@ -878,6 +939,7 @@ async def start_service(service_name: str) -> str:
             "",
             f"Cluster: {cluster_name}",
             f"Service: {service_name}",
+            f"Previous State: {current_state}",
             f"Request ID: {request_id}",
             f"Status: {request_status}",
             f"Monitor URL: {request_href}",
@@ -918,12 +980,20 @@ async def stop_service(service_name: str) -> str:
     """
     cluster_name = AMBARI_CLUSTER_NAME
     try:
-        # Check if service exists
+        # Check if service exists and get current status
         service_endpoint = f"/clusters/{cluster_name}/services/{service_name}"
         service_check = await make_ambari_request(service_endpoint)
         
-        if service_check.get("error"):
+        if service_check is None or service_check.get("error"):
             return f"Error: Service '{service_name}' not found in cluster '{cluster_name}'."
+        
+        # Check current service state
+        service_info = service_check.get("ServiceInfo", {})
+        current_state = service_info.get("state", "UNKNOWN")
+        
+        # If service is already stopped, return appropriate message
+        if current_state in ["INSTALLED", "INSTALL_FAILED"]:
+            return f"Service '{service_name}' is already stopped (state: {current_state}). No action needed."
         
         # Stop the service (set state to INSTALLED)
         payload = {
@@ -939,11 +1009,16 @@ async def stop_service(service_name: str) -> str:
         
         response_data = await make_ambari_request(service_endpoint, method="PUT", data=payload)
         
-        if response_data.get("error"):
-            return f"Error: Failed to stop service '{service_name}' in cluster '{cluster_name}'."
+        if response_data is None or response_data.get("error"):
+            error_msg = response_data.get("error") if response_data else "Unknown error occurred"
+            return f"Error: Failed to stop service '{service_name}' - {error_msg}"
         
-        # Extract request information
-        request_info = response_data.get("Requests", {})
+        # Extract request information safely
+        request_info = response_data.get("Requests")
+        if request_info is None:
+            # If no Requests field, but no error, the service might have stopped immediately
+            return f"Service '{service_name}' stop command sent successfully. Previous state: {current_state}"
+        
         request_id = request_info.get("id", "Unknown")
         request_status = request_info.get("status", "Unknown")
         request_href = response_data.get("href", "")
@@ -953,6 +1028,7 @@ async def stop_service(service_name: str) -> str:
             "",
             f"Cluster: {cluster_name}",
             f"Service: {service_name}",
+            f"Previous State: {current_state}",
             f"Request ID: {request_id}",
             f"Status: {request_status}",
             f"Monitor URL: {request_href}",
@@ -1070,8 +1146,38 @@ async def restart_service(service_name: str) -> str:
     cluster_name = AMBARI_CLUSTER_NAME
 
     try:
+        # Check if service exists and get current status first
+        service_endpoint = f"/clusters/{cluster_name}/services/{service_name}"
+        service_check = await make_ambari_request(service_endpoint)
+        
+        if service_check is None or service_check.get("error"):
+            return f"Error: Service '{service_name}' not found in cluster '{cluster_name}'."
+        
+        # Get current service state for better feedback
+        service_info = service_check.get("ServiceInfo", {})
+        initial_state = service_info.get("state", "UNKNOWN")
+        
+        # Check for existing active requests for this service
+        active_requests = await check_service_active_requests(cluster_name, service_name)
+        if active_requests:
+            active_info = []
+            for req in active_requests:
+                active_info.append(f"Request ID {req['id']}: {req['context']} (Status: {req['status']}, Progress: {req['progress']}%)")
+            
+            return f"""Service '{service_name}' has active operations in progress. Please wait for completion before restarting.
+
+Active operations:
+{chr(10).join(active_info)}
+
+Recommendation:
+- Use get_request_status(request_id) to monitor progress
+- Wait for completion before attempting restart
+- Or check get_active_requests() for all cluster operations
+
+Current service state: {initial_state}"""
+        
         # Step 1: Stop the service
-        logger.info("Stopping service '%s'...", service_name)
+        logger.info("Stopping service '%s' (current state: %s)...", service_name, initial_state)
         stop_endpoint = f"/clusters/{cluster_name}/services/{service_name}"
         stop_payload = {
             "RequestInfo": {
@@ -1091,31 +1197,41 @@ async def restart_service(service_name: str) -> str:
 
         stop_response = await make_ambari_request(stop_endpoint, method="PUT", data=stop_payload)
 
-        if "error" in stop_response:
-            return f"Error: Unable to stop service '{service_name}'. {stop_response['error']}"
+        if stop_response is None or stop_response.get("error"):
+            error_msg = stop_response.get("error") if stop_response else "Unknown error occurred"
+            return f"Error: Unable to stop service '{service_name}'. {error_msg}"
 
-        stop_request_id = stop_response.get("Requests", {}).get("id", "Unknown")
-        if stop_request_id == "Unknown":
-            return f"Error: Failed to retrieve stop request ID for service '{service_name}'."
+        # Extract stop request information safely
+        stop_requests = stop_response.get("Requests")
+        if stop_requests is None:
+            # If service was already stopped, continue with start
+            logger.info("Service '%s' may already be stopped, proceeding with start...", service_name)
+            stop_request_id = "N/A (already stopped)"
+        else:
+            stop_request_id = stop_requests.get("id", "Unknown")
+            if stop_request_id == "Unknown":
+                return f"Error: Failed to retrieve stop request ID for service '{service_name}'."
 
-        # Step 2: Wait for the stop operation to complete (print progress only for stop)
-        while True:
-            status_endpoint = f"/clusters/{cluster_name}/requests/{stop_request_id}"
-            status_response = await make_ambari_request(status_endpoint)
+            # Step 2: Wait for the stop operation to complete (print progress only for stop)
+            while True:
+                status_endpoint = f"/clusters/{cluster_name}/requests/{stop_request_id}"
+                status_response = await make_ambari_request(status_endpoint)
 
-            if "error" in status_response:
-                return f"Error: Unable to check status of stop operation for service '{service_name}'. {status_response['error']}"
+                if status_response is None or status_response.get("error"):
+                    error_msg = status_response.get("error") if status_response else "Unknown error occurred"
+                    return f"Error: Unable to check status of stop operation for service '{service_name}'. {error_msg}"
 
-            request_status = status_response.get("Requests", {}).get("request_status", "Unknown")
-            progress_percent = status_response.get("Requests", {}).get("progress_percent", 0)
+                request_info = status_response.get("Requests", {})
+                request_status = request_info.get("request_status", "Unknown")
+                progress_percent = request_info.get("progress_percent", 0)
 
-            if request_status == "COMPLETED":
-                break
-            elif request_status in ["FAILED", "ABORTED"]:
-                return f"Error: Stop operation for service '{service_name}' failed with status '{request_status}'."
+                if request_status == "COMPLETED":
+                    break
+                elif request_status in ["FAILED", "ABORTED"]:
+                    return f"Error: Stop operation for service '{service_name}' failed with status '{request_status}'."
 
-            logger.info("Stopping service '%s'... Progress: %d%%", service_name, progress_percent)
-            await asyncio.sleep(2)  # Wait for 5 seconds before checking again
+                logger.info("Stopping service '%s'... Progress: %d%%", service_name, progress_percent)
+                await asyncio.sleep(2)  # Wait for 2 seconds before checking again
 
     # Step 3: Start the service (no progress output beyond capturing request id)
         start_endpoint = f"/clusters/{cluster_name}/services/{service_name}"
@@ -1137,11 +1253,32 @@ async def restart_service(service_name: str) -> str:
 
         start_response = await make_ambari_request(start_endpoint, method="PUT", data=start_payload)
 
-        if "error" in start_response:
-            return f"Error: Unable to start service '{service_name}'. {start_response['error']}"
+        if start_response is None or start_response.get("error"):
+            error_msg = start_response.get("error") if start_response else "Unknown error occurred"
+            return f"Error: Unable to start service '{service_name}'. {error_msg}"
 
-        start_request_id = start_response.get("Requests", {}).get("id", "Unknown")
-        start_status = start_response.get("Requests", {}).get("status", "Unknown")
+        # Extract start request information safely
+        start_requests = start_response.get("Requests")
+        if start_requests is None:
+            # If no Requests field, service might have started immediately
+            logger.info("Service '%s' successfully restarted.", service_name)
+            result_lines = [
+                f"RESTART SERVICE: {service_name}",
+                f"Stop Request ID: {stop_request_id}",
+                f"Start Request ID: N/A (immediate)",
+                "",
+                f"Cluster: {cluster_name}",
+                f"Service: {service_name}",
+                f"Initial State: {initial_state}",
+                f"Stop Status: COMPLETED",
+                f"Start Status: Command sent successfully",
+                "",
+                f"Next: get_service_status(\"{service_name}\") to verify current state.",
+            ]
+            return "\n".join(result_lines)
+        
+        start_request_id = start_requests.get("id", "Unknown")
+        start_status = start_requests.get("status", "Unknown")
         start_href = start_response.get("href", "")
 
         logger.info("Service '%s' successfully restarted.", service_name)
@@ -1152,6 +1289,7 @@ async def restart_service(service_name: str) -> str:
             "",
             f"Cluster: {cluster_name}",
             f"Service: {service_name}",
+            f"Initial State: {initial_state}",
             f"Stop Status: COMPLETED",  # by this point stop loop exited on COMPLETED
             f"Start Status: {start_status}",
             f"Start Monitor URL: {start_href}",
