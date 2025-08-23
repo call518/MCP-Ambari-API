@@ -42,24 +42,6 @@
 
 ---
 
-## Dev Env
-
-- WSL2(networkingMode = bridged) + Docker-Desktop
-  - `.wslconfig`: tested with `networkingMode = bridged`
-- Python 3.11 venv
-
-  ```bash
-  ### Option-1: with uv
-  uv venv --python 3.11 --seed
-
-  ### Option-2: with pip
-  python3.11 -m venv .venv
-  source .venv/bin/activate
-  pip install -U pip
-  ```
-
----
-
 ## 🚀 QuickStart Guide /w Docker
 
 > **Note:** The following instructions assume you are using the `streamable-http` mode for MCP Server.
@@ -495,6 +477,23 @@ This MCP server provides the following tools for Ambari cluster management:
 - **API**: Apache Ambari REST API
 - **Transport**: stdio (local) and streamable-http (remote)
 - **Deployment**: Docker, Docker Compose, PyPI
+
+
+### Dev Env.
+
+- WSL2(networkingMode = bridged) + Docker-Desktop
+  - `.wslconfig`: tested with `networkingMode = bridged`
+- Python 3.11 venv
+
+  ```bash
+  ### Option-1: with uv
+  uv venv --python 3.11 --seed
+
+  ### Option-2: with pip
+  python3.11 -m venv .venv
+  source .venv/bin/activate
+  pip install -U pip
+  ```
 
 ---
 
