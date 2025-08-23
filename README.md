@@ -478,7 +478,6 @@ This MCP server provides the following tools for Ambari cluster management:
 - **Transport**: stdio (local) and streamable-http (remote)
 - **Deployment**: Docker, Docker Compose, PyPI
 
-
 ### Dev Env.
 
 - WSL2(networkingMode = bridged) + Docker-Desktop
