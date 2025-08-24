@@ -12,6 +12,12 @@
 
 ---
 
+[![Stargazers repo roster for @call518/MCP-Ambari-API](https://reporoster.com/stars/call518/MCP-Ambari-API)](https://github.com/call518/MCP-Ambari-API/stargazers)
+
+[![Forkers repo roster for @call518/MCP-Ambari-API](https://reporoster.com/forks/call518/MCP-Ambari-API)](https://github.com/call518/MCP-Ambari-API/network/members)
+
+---
+
 ## 📋 Overview
 
 **MCP Ambari API** is a powerful Model Context Protocol (MCP) server that enables seamless Apache Ambari cluster management through natural language commands. Built for DevOps engineers, data engineers, and system administrators who work with Hadoop ecosystems.
