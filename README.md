@@ -396,27 +396,27 @@ AMBARI_CLUSTER_NAME=your-cluster-name
 ```json
 {
   "mcpServers": {
-    "ambari-cluster-A": {
+    "Ambari-Cluster-A": {
       "command": "uvx",
       "args": ["--python", "3.11", "mcp-ambari-api"],
       "env": {
-        "AMBARI_HOST": "a.cluster.ambari",
-        "AMBARI_PORT": "7070",
-        "AMBARI_USER": "admin",
-        "AMBARI_PASS": "changeme!@34",
-        "AMBARI_CLUSTER_NAME": "TEST-AMBARI",
+        "AMBARI_HOST": "a.foo.com",
+        "AMBARI_PORT": "8080",
+        "AMBARI_USER": "admin-user",
+        "AMBARI_PASS": "admin-pass",
+        "AMBARI_CLUSTER_NAME": "AMBARI-A",
         "AMBARI_LOG_LEVEL": "INFO"
       }
     },
-    "ambari-cluster-B": {
+    "Ambari-Cluster-B": {
       "command": "uvx",
       "args": ["--python", "3.11", "mcp-ambari-api"],
       "env": {
-        "AMBARI_HOST": "b.cluster.ambari",
-        "AMBARI_PORT": "7070",
-        "AMBARI_USER": "admin",
-        "AMBARI_PASS": "changeme!@34",
-        "AMBARI_CLUSTER_NAME": "TEST-AMBARI",
+        "AMBARI_HOST": "b.bar.com",
+        "AMBARI_PORT": "8080",
+        "AMBARI_USER": "admin-user",
+        "AMBARI_PASS": "admin-pass",
+        "AMBARI_CLUSTER_NAME": "AMBARI-B",
         "AMBARI_LOG_LEVEL": "INFO"
       }
     }
