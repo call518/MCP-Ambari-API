@@ -16,12 +16,6 @@
 
 ---
 
-[![Stargazers repo roster for @call518/MCP-Ambari-API](https://reporoster.com/stars/call518/MCP-Ambari-API)](https://github.com/call518/MCP-Ambari-API/stargazers)
-
-[![Forkers repo roster for @call518/MCP-Ambari-API](https://reporoster.com/forks/call518/MCP-Ambari-API)](https://github.com/call518/MCP-Ambari-API/network/members)
-
----
-
 ### 🎯 What You Can Do
 
 - **Automated Service Management**: Start, stop, restart Hadoop services (HDFS, YARN, Spark, etc.) with simple commands
