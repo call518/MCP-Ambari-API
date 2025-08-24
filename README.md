@@ -366,6 +366,33 @@ AMBARI_CLUSTER_NAME=your-cluster-name
 
 ---
 
+## Example usage: Claude-Desktop
+
+**claude_desktop_config.json**
+
+```json
+{
+  "mcpServers": {
+    "ambari-api": {
+      "command": "uvx",
+      "args": ["--python", "3.11", "mcp-ambari-api"],
+      "env": {
+        "AMBARI_HOST": "localhost",
+        "AMBARI_PORT": "7070",
+        "AMBARI_USER": "admin",
+        "AMBARI_PASS": "changeme!@34",
+        "AMBARI_CLUSTER_NAME": "TEST-AMBARI",
+        "AMBARI_LOG_LEVEL": "INFO"
+      }
+    }
+  }
+}
+```
+
+![Example: Claude-Desktop(3)](img/ex-screenshot-claude-desktop-001.png)
+
+---
+
 ## 🎯 Core Features & Capabilities
 
 ### Service Operations
