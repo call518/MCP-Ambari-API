@@ -391,6 +391,39 @@ AMBARI_CLUSTER_NAME=your-cluster-name
 
 ![Example: Claude-Desktop(3)](img/ex-screenshot-claude-desktop-001.png)
 
+**(Option) Configure Multiple Ambari Cluster**
+
+```json
+{
+  "mcpServers": {
+    "ambari-cluster-A": {
+      "command": "uvx",
+      "args": ["--python", "3.11", "mcp-ambari-api"],
+      "env": {
+        "AMBARI_HOST": "a.cluster.ambari",
+        "AMBARI_PORT": "7070",
+        "AMBARI_USER": "admin",
+        "AMBARI_PASS": "changeme!@34",
+        "AMBARI_CLUSTER_NAME": "TEST-AMBARI",
+        "AMBARI_LOG_LEVEL": "INFO"
+      }
+    },
+    "ambari-cluster-B": {
+      "command": "uvx",
+      "args": ["--python", "3.11", "mcp-ambari-api"],
+      "env": {
+        "AMBARI_HOST": "b.cluster.ambari",
+        "AMBARI_PORT": "7070",
+        "AMBARI_USER": "admin",
+        "AMBARI_PASS": "changeme!@34",
+        "AMBARI_CLUSTER_NAME": "TEST-AMBARI",
+        "AMBARI_LOG_LEVEL": "INFO"
+      }
+    }
+  }
+}
+```
+
 ---
 
 ## 🎯 Core Features & Capabilities
