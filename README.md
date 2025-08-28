@@ -596,15 +596,3 @@ We're always excited to welcome new contributors! Whether you're fixing a typo, 
 ## 📄 License
 
 This project is licensed under the MIT License.
-
-# Google-Analytics
-
-<!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-V1P3FDK1CP"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag('js', new Date());
-
-  gtag('config', 'G-V1P3FDK1CP');
-</script>
