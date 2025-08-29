@@ -14,4 +14,4 @@ RUN pip install mcp-ambari-api
 
 #EXPOSE 8000
 
-CMD ["python", "-m", "mcp-ambari-api"]
+CMD ["mcp-ambari-api", "--type", "stdio"]
