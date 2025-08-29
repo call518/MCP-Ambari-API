@@ -5,9 +5,11 @@ build:
   dockerBuildPath: .
 runtime: container
 startCommand:
-  type: http
-  endpoint: /mcp
+  type: stdio
   configSchema:
+    # JSON Schema defining the configuration options for the MCP.
+    type: object
+    required: []
     properties:
       AMBARI_HOST: { type: string, default: "localhost" }
       AMBARI_PORT: { type: string, default: "8080" }
@@ -15,7 +17,21 @@ startCommand:
       AMBARI_PASS: { type: string, default: "admin" }
       AMBARI_CLUSTER_NAME: { type: string, default: "TEST-AMBARI" }
       AMBARI_LOG_LEVEL: { type: string, default: "INFO" }
-    required: []
+  commandFunction:
+    # A JS function that produces the CLI command based on the given config to start the MCP on stdio.
+    |-
+    (config) => ({
+      command: 'mcp-ambari-api',
+      args: [],
+      env: {
+        AMBARI_HOST: config.AMBARI_HOST,
+        AMBARI_PORT: config.AMBARI_PORT,
+        AMBARI_USER: config.AMBARI_USER,
+        AMBARI_PASS: config.AMBARI_PASS,
+        AMBARI_CLUSTER_NAME: config.AMBARI_CLUSTER_NAME,
+        AMBARI_LOG_LEVEL: config.AMBARI_LOG_LEVEL
+      }
+    })
   exampleConfig:
     AMBARI_HOST: host.docker.internal
     AMBARI_PASS: admin
