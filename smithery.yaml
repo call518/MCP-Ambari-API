@@ -6,41 +6,16 @@ build:
 runtime: container
 startCommand:
   type: http
+  endpoint: /mcp
   configSchema:
-    # JSON Schema defining the configuration options for the MCP.
-    type: object
-    required:
-      - AMBARI_HOST
-      - AMBARI_PORT
-      - AMBARI_USER
-      - AMBARI_PASS
-      - AMBARI_CLUSTER_NAME
-      - AMBARI_LOG_LEVEL
     properties:
-      AMBARI_HOST:
-        type: string
-        default: 127.0.0.1
-        description: Ambari server hostname or IP (e.g. host.docker.internal)
-      AMBARI_PASS:
-        type: string
-        default: admin
-        description: Ambari password
-      AMBARI_PORT:
-        type: string
-        default: "8080"
-        description: Ambari server port
-      AMBARI_USER:
-        type: string
-        default: admin
-        description: Ambari username
-      AMBARI_LOG_LEVEL:
-        type: string
-        default: INFO
-        description: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
-      AMBARI_CLUSTER_NAME:
-        type: string
-        default: TEST-AMBARI
-        description: Ambari cluster name
+      AMBARI_HOST: { type: string, default: "localhost" }
+      AMBARI_PORT: { type: string, default: "8080" }
+      AMBARI_USER: { type: string, default: "admin" }
+      AMBARI_PASS: { type: string, default: "admin" }
+      AMBARI_CLUSTER_NAME: { type: string, default: "TEST-AMBARI" }
+      AMBARI_LOG_LEVEL: { type: string, default: "INFO" }
+    required: []
   exampleConfig:
     AMBARI_HOST: host.docker.internal
     AMBARI_PASS: admin
