@@ -9,6 +9,7 @@
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/call518/MCP-Ambari-API)
 [![Verified on MSeeP](https://mseep.ai/badge.svg)](https://mseep.ai/app/2fd522d4-863d-479d-96f7-e24c7fb531db)
 [![BuyMeACoffee](https://raw.githubusercontent.com/pachadotdev/buymeacoffee-badges/main/bmc-donate-yellow.svg)](https://www.buymeacoffee.com/call518)
+[![smithery badge](https://smithery.ai/badge/@call518/mcp-ambari-api)](https://smithery.ai/server/@call518/mcp-ambari-api)
 
 ## 📋 Overview
 
@@ -310,6 +311,14 @@ AMBARI_PORT=your-ambari-port
 AMBARI_USER=your-username
 AMBARI_PASS=your-password
 AMBARI_CLUSTER_NAME=your-cluster-name
+```
+
+### Installing via Smithery
+
+To install mcp-ambari-api for Claude Desktop automatically via [Smithery](https://smithery.ai/server/@call518/mcp-ambari-api):
+
+```bash
+npx -y @smithery/cli install @call518/mcp-ambari-api --client claude
 ```
 
 ### Method 1: Local MCP (transport="stdio")
