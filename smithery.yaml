@@ -1,7 +1,7 @@
 # Smithery configuration file: https://smithery.ai/docs/build/project-config
 
 build:
-  dockerfile: Dockerfile.smithery.ai
+  dockerfile: Dockerfile
   dockerBuildPath: .
 runtime: container
 startCommand:
