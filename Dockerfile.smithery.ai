@@ -10,7 +10,7 @@ RUN dnf install -y python${PYTHON_VERSION} python${PYTHON_VERSION}-pip git && dn
 
 WORKDIR /app
 
-COPY . /app
+#COPY . /app
 
 # Fetch git tags and update version
 # RUN git fetch --tags origin && \
@@ -19,14 +19,16 @@ COPY . /app
 #     sed -i "s|^version = \".*\"|version = \"${LATEST_TAG}\"|" pyproject.toml && \
 #     rm -rf .git
 
-RUN pip install --no-cache-dir --upgrade wheel
+#RUN pip install --no-cache-dir --upgrade wheel
 
-RUN pip install --no-cache-dir --upgrade 'uv>=0.8.5'
+#RUN pip install --no-cache-dir --upgrade 'uv>=0.8.5'
 
-RUN uv sync
+#RUN uv sync
 
-RUN pip install .
+#RUN pip install .
 
-ENV PYTHONPATH=/app/src
+#ENV PYTHONPATH=/app/src
 
-CMD ["python", "-m", "mcp_abmari_api.ambari_api"]
+RUN pip install mcp-ambari-api
+
+CMD ["python", "mcp-ambari-api"]
