@@ -1,28 +1,36 @@
 # Smithery configuration file: https://smithery.ai/docs/build/project-config
 
-build:
-  dockerfile: Dockerfile
-  dockerBuildPath: .
-runtime: container
 startCommand:
   type: stdio
   configSchema:
     # JSON Schema defining the configuration options for the MCP.
     type: object
-    required: []
+    required:
+      - AMBARI_HOST
+      - AMBARI_PORT
+      - AMBARI_USER
+      - AMBARI_PASS
+      - AMBARI_CLUSTER_NAME
+      - AMBARI_LOG_LEVEL
     properties:
-      AMBARI_HOST: { type: string, default: "localhost" }
-      AMBARI_PORT: { type: string, default: "8080" }
-      AMBARI_USER: { type: string, default: "admin" }
-      AMBARI_PASS: { type: string, default: "admin" }
-      AMBARI_CLUSTER_NAME: { type: string, default: "TEST-AMBARI" }
-      AMBARI_LOG_LEVEL: { type: string, default: "INFO" }
+      AMBARI_HOST:
+        type: string
+      AMBARI_PORT:
+        type: string
+      AMBARI_USER:
+        type: string
+      AMBARI_PASS:
+        type: string
+      AMBARI_CLUSTER_NAME:
+        type: string
+      AMBARI_LOG_LEVEL:
+        type: string
   commandFunction:
     # A JS function that produces the CLI command based on the given config to start the MCP on stdio.
     |-
     (config) => ({
       command: 'mcp-ambari-api',
-      args: [],
+      args: ["--type", "stdio"],
       env: {
         AMBARI_HOST: config.AMBARI_HOST,
         AMBARI_PORT: config.AMBARI_PORT,
@@ -35,7 +43,7 @@ startCommand:
   exampleConfig:
     AMBARI_HOST: host.docker.internal
     AMBARI_PASS: admin
-    AMBARI_PORT: "8080"
+    AMBARI_PORT: 8080
     AMBARI_USER: admin
     AMBARI_LOG_LEVEL: DEBUG
     AMBARI_CLUSTER_NAME: TEST-AMBARI
