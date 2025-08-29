@@ -12,6 +12,8 @@ WORKDIR /app
 
 RUN pip install mcp-ambari-api
 
-EXPOSE 8000
+#EXPOSE 8000
 
-CMD ["mcp-ambari-api", "--type", "streamable-http", "--host", "0.0.0.0", "--port", "8000"]
+#CMD ["mcp-ambari-api", "--type", "streamable-http", "--host", "0.0.0.0", "--port", "8000"]
+
+CMD ["sh","-lc","exec mcp-ambari-api --type streamable-http --host 0.0.0.0 --port ${PORT:-8000}"]
