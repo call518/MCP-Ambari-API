@@ -2276,7 +2276,7 @@ def main(argv: Optional[List[str]] = None):
         "--port",
         dest="port",
         type=int,
-        help="Port number for streamable-http transport. Default: 8080",
+        help="Port number for streamable-http transport. Default: 8000",
     )
     # Allow future extension without breaking unknown args usage
     args = parser.parse_args(argv)
@@ -2304,7 +2304,7 @@ def main(argv: Optional[List[str]] = None):
     host = args.host or os.getenv("FASTMCP_HOST", "127.0.0.1")
     
     # Port 결정 (간결하게)
-    port = args.port or int(os.getenv("FASTMCP_PORT", 8080))
+    port = args.port or int(os.getenv("FASTMCP_PORT", 8000))
 
     # Transport 모드에 따른 실행
     if transport_type == "streamable-http":

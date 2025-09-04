@@ -8,7 +8,7 @@
 [![Deploy to PyPI with tag](https://github.com/call518/MCP-Ambari-API/actions/workflows/pypi-publish.yml/badge.svg)](https://github.com/call518/MCP-Ambari-API/actions/workflows/pypi-publish.yml)
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/call518/MCP-Ambari-API)
 [![Verified on MSeeP](https://mseep.ai/badge.svg)](https://mseep.ai/app/2fd522d4-863d-479d-96f7-e24c7fb531db)
-[![BuyMeACoffee](https://raw.githubusercontent.com/pachadotdev/buymeacoffee-badges/main/bmc-donate-yellow.svg)](https://www.buymeacoffee.com/call518)
+[![BuyMeACoffee](https://raw.githubusercontent.com/pachadotdev/buymeacoffee-badges/main/bmc-donate-yellow.svg)](https://www.buymeacoffee.com/call518)p
 
 ## 📋 Overview
 
@@ -258,7 +258,7 @@ This MCP server supports two connection modes: **stdio** (traditional) and **str
 
 - `--type` (`-t`): Transport type (`stdio` or `streamable-http`) - Default: `stdio`
 - `--host`: Host address for HTTP transport - Default: `127.0.0.1`  
-- `--port` (`-p`): Port number for HTTP transport - Default: `8080`
+- `--port` (`-p`): Port number for HTTP transport - Default: `8000`
 
 ### Environment Variables
 
@@ -268,7 +268,7 @@ This MCP server supports two connection modes: **stdio** (traditional) and **str
 | `MCP_LOG_LEVEL` | Server logging verbosity (DEBUG, INFO, WARNING, ERROR) | `INFO` | `INFO` |
 | `FASTMCP_TYPE` | MCP transport protocol (stdio for CLI, streamable-http for web) | `stdio` | `streamable-http` |
 | `FASTMCP_HOST` | HTTP server bind address (0.0.0.0 for all interfaces) | `127.0.0.1` | `0.0.0.0` |
-| `FASTMCP_PORT` | HTTP server port for MCP communication | `8080` | `8080` |
+| `FASTMCP_PORT` | HTTP server port for MCP communication | `8000` | `8000` |
 | `AMBARI_HOST` | Ambari server hostname or IP address | `127.0.0.1` | `host.docker.internal` |
 | `AMBARI_PORT` | Ambari server port number | `8080` | `8080` |
 | `AMBARI_USER` | Username for Ambari server authentication | `admin` | `admin` |
@@ -357,7 +357,7 @@ AMBARI_CLUSTER_NAME=your-cluster-name
   "mcpServers": {
     "ambari-api": {
       "type": "streamable-http",
-      "url": "http://localhost:8080/mcp"
+      "url": "http://localhost:8000/mcp"
     }
   }
 }
