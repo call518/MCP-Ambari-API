@@ -278,8 +278,6 @@ This MCP server supports two connection modes: **stdio** (traditional) and **str
 | `DOCKER_EXTERNAL_PORT_OPENWEBUI` | Host port mapping for Open WebUI container | `8080` | `3001` |
 | `DOCKER_EXTERNAL_PORT_MCP_SERVER` | Host port mapping for MCP server container | `8080` | `18001` |
 | `DOCKER_EXTERNAL_PORT_MCPO_PROXY` | Host port mapping for MCPO proxy container | `8000` | `8001` |
-| `MCP_SERVER_IMAGE_VERSION` | Docker image version for MCP server | `latest` | `1.0.0` |
-| `MCPO_PROXY_IMAGE_VERSION` | Docker image version for MCPO proxy | `latest` | `1.0.2` |
 
 **Note**: `AMBARI_CLUSTER_NAME` serves as the default target cluster for operations when no specific cluster is specified. All environment variables can be configured via the `.env` file. 
 
