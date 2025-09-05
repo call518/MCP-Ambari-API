@@ -33,7 +33,7 @@ startCommand:
       - AMBARI_USER
       - AMBARI_PASS
       - AMBARI_CLUSTER_NAME
-      - AMBARI_LOG_LEVEL
+      - MCP_LOG_LEVEL
     properties:
       AMBARI_HOST:
         type: string
@@ -60,7 +60,7 @@ startCommand:
         description: "Ambari cluster name"
         default: TEST-AMBARI
         secret: false
-      AMBARI_LOG_LEVEL:
+      MCP_LOG_LEVEL:
         type: string
         description: "Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)"
         default: INFO
@@ -76,12 +76,12 @@ startCommand:
   #       AMBARI_USER: config.AMBARI_USER,
   #       AMBARI_PASS: config.AMBARI_PASS,
   #       AMBARI_CLUSTER_NAME: config.AMBARI_CLUSTER_NAME,
-  #       AMBARI_LOG_LEVEL: config.AMBARI_LOG_LEVEL
+  #       MCP_LOG_LEVEL: config.MCP_LOG_LEVEL
   #     };
   #     const args = [];
   #     // Also pass as CLI flag for immediate override (env still available inside process)
-  #     if (config.AMBARI_LOG_LEVEL) {
-  #       args.push('--log-level', config.AMBARI_LOG_LEVEL);
+  #     if (config.MCP_LOG_LEVEL) {
+  #       args.push('--log-level', config.MCP_LOG_LEVEL);
   #     }
   #     return { command: 'mcp-ambari-api', args, env };
   #   }
@@ -92,7 +92,7 @@ startCommand:
     AMBARI_USER: admin
     AMBARI_PASS: admin
     AMBARI_CLUSTER_NAME: TEST-AMBARI
-    AMBARI_LOG_LEVEL: DEBUG
+    MCP_LOG_LEVEL: DEBUG
 
 ## Notes:
 ## - Set AMBARI_PASS via Smithery secret storage if available.

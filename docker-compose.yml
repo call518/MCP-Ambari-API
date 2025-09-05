@@ -27,7 +27,7 @@ services:
       - AMBARI_USER=${AMBARI_USER}
       - AMBARI_PASS=${AMBARI_PASS}
       - AMBARI_CLUSTER_NAME=${AMBARI_CLUSTER_NAME}
-      - AMBARI_LOG_LEVEL=${AMBARI_LOG_LEVEL}
+      - MCP_LOG_LEVEL=${MCP_LOG_LEVEL}
     volumes:
       - ./src:/app/src/
       - ./scripts:/app/scripts

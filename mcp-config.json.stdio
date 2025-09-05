@@ -10,7 +10,7 @@
         "AMBARI_USER": "admin",
         "AMBARI_PASS": "changeme!@34",
         "AMBARI_CLUSTER_NAME": "TEST-AMBARI",
-        "AMBARI_LOG_LEVEL": "DEBUG"
+        "MCP_LOG_LEVEL": "DEBUG"
       }
     }
   }

@@ -9,5 +9,5 @@ npx -y @modelcontextprotocol/inspector \
 	-e AMBARI_USER='admin' \
 	-e AMBARI_PASS='admin' \
 	-e AMBARI_CLUSTER_NAME='TEST-AMBARI' \
-	-e AMBARI_LOG_LEVEL='INFO' \
+	-e MCP_LOG_LEVEL='INFO' \
 	-- uvx mcp-ambari-api

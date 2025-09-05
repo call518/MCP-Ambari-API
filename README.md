@@ -274,7 +274,6 @@ This MCP server supports two connection modes: **stdio** (traditional) and **str
 | `AMBARI_USER` | Username for Ambari server authentication | `admin` | `admin` |
 | `AMBARI_PASS` | Password for Ambari server authentication | `changeme!@34` | `admin` |
 | `AMBARI_CLUSTER_NAME` | Name of the target Ambari cluster | `TEST-AMBARI` | `TEST-AMBARI` |
-| `AMBARI_LOG_LEVEL` | Logging level for the MCP server (DEBUG, INFO, WARNING, ERROR) | `INFO` | `INFO` |
 | `DOCKER_EXTERNAL_PORT_OPENWEBUI` | Host port mapping for Open WebUI container | `8080` | `3001` |
 | `DOCKER_EXTERNAL_PORT_MCP_SERVER` | Host port mapping for MCP server container | `8080` | `18001` |
 | `DOCKER_EXTERNAL_PORT_MCPO_PROXY` | Host port mapping for MCPO proxy container | `8000` | `8001` |
@@ -324,7 +323,7 @@ AMBARI_CLUSTER_NAME=your-cluster-name
         "AMBARI_USER": "admin",
         "AMBARI_PASS": "admin",
         "AMBARI_CLUSTER_NAME": "TEST-AMBARI",
-        "AMBARI_LOG_LEVEL": "INFO"
+        "MCP_LOG_LEVEL": "INFO"
       }
     }
   }
@@ -379,7 +378,7 @@ AMBARI_CLUSTER_NAME=your-cluster-name
         "AMBARI_USER": "admin",
         "AMBARI_PASS": "changeme!@34",
         "AMBARI_CLUSTER_NAME": "TEST-AMBARI",
-        "AMBARI_LOG_LEVEL": "INFO"
+        "MCP_LOG_LEVEL": "INFO"
       }
     }
   }
@@ -402,7 +401,7 @@ AMBARI_CLUSTER_NAME=your-cluster-name
         "AMBARI_USER": "admin-user",
         "AMBARI_PASS": "admin-pass",
         "AMBARI_CLUSTER_NAME": "AMBARI-A",
-        "AMBARI_LOG_LEVEL": "INFO"
+        "MCP_LOG_LEVEL": "INFO"
       }
     },
     "Ambari-Cluster-B": {
@@ -414,7 +413,7 @@ AMBARI_CLUSTER_NAME=your-cluster-name
         "AMBARI_USER": "admin-user",
         "AMBARI_PASS": "admin-pass",
         "AMBARI_CLUSTER_NAME": "AMBARI-B",
-        "AMBARI_LOG_LEVEL": "INFO"
+        "MCP_LOG_LEVEL": "INFO"
       }
     }
   }
@@ -566,7 +565,7 @@ This MCP server provides the following tools for Ambari cluster management:
 
 ### Q: How do I troubleshoot connection issues?
 
-**A**: Check your `AMBARI_HOST`, `AMBARI_PORT`, and network connectivity. Enable debug logging with `AMBARI_LOG_LEVEL=DEBUG`.
+**A**: Check your `AMBARI_HOST`, `AMBARI_PORT`, and network connectivity. Enable debug logging with `MCP_LOG_LEVEL=DEBUG`.
 
 ### Q: How does this compare to Ambari Web UI?
 
