@@ -8,7 +8,7 @@
         "AMBARI_HOST": "host.docker.internal",
         "AMBARI_PORT": "7070",
         "AMBARI_USER": "admin",
-        "AMBARI_PASS": "changeme!@34",
+        "AMBARI_PASS": "admin",
         "AMBARI_CLUSTER_NAME": "TEST-AMBARI",
         "MCP_LOG_LEVEL": "DEBUG"
       }

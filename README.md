@@ -70,11 +70,12 @@ Start the `MCP-Server`, `MCPO`(MCP-Proxy for OpenAPI), and `OpenWebUI`.
    ```
 1. **Configure your Ambari connection in `.env` file:**
    ```bash
-   AMBARI_HOST=your-ambari-host
-   AMBARI_PORT=your-ambari-port
-   AMBARI_USER=your-username  
-   AMBARI_PASS=your-password
-   AMBARI_CLUSTER_NAME=your-cluster-name
+   # Example values provided
+   AMBARI_HOST=host.docker.internal
+   AMBARI_PORT=7070
+   AMBARI_USER=admin
+   AMBARI_PASS=admin
+   AMBARI_CLUSTER_NAME=TEST-AMBARI
    ```
 1. Run:
    ```bash
@@ -272,7 +273,7 @@ This MCP server supports two connection modes: **stdio** (traditional) and **str
 | `AMBARI_HOST` | Ambari server hostname or IP address | `127.0.0.1` | `host.docker.internal` |
 | `AMBARI_PORT` | Ambari server port number | `8080` | `8080` |
 | `AMBARI_USER` | Username for Ambari server authentication | `admin` | `admin` |
-| `AMBARI_PASS` | Password for Ambari server authentication | `changeme!@34` | `admin` |
+| `AMBARI_PASS` | Password for Ambari server authentication | `admin` | `admin` |
 | `AMBARI_CLUSTER_NAME` | Name of the target Ambari cluster | `TEST-AMBARI` | `TEST-AMBARI` |
 | `DOCKER_EXTERNAL_PORT_OPENWEBUI` | Host port mapping for Open WebUI container | `8080` | `3001` |
 | `DOCKER_EXTERNAL_PORT_MCP_SERVER` | Host port mapping for MCP server container | `8080` | `18001` |
@@ -376,7 +377,7 @@ AMBARI_CLUSTER_NAME=your-cluster-name
         "AMBARI_HOST": "localhost",
         "AMBARI_PORT": "7070",
         "AMBARI_USER": "admin",
-        "AMBARI_PASS": "changeme!@34",
+        "AMBARI_PASS": "admin",
         "AMBARI_CLUSTER_NAME": "TEST-AMBARI",
         "MCP_LOG_LEVEL": "INFO"
       }
