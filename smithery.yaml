@@ -21,9 +21,9 @@ build:
 runtime: "container"
 
 startCommand:
-  #type: stdio
-  type: http
-  endpoint: /mcp
+  type: stdio
+  # type: http
+  # endpoint: /mcp
   # User-supplied configuration schema mapped to environment variables.
   configSchema:
     type: object
