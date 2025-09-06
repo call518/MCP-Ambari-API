@@ -43,13 +43,13 @@ logger = logging.getLogger("AmbariService")
 # Authentication Setup
 # =============================================================================
 
-def create_mcp_instance(auth_enable: bool = False, secret_key: str = "") -> FastMCP:
-    """Create FastMCP instance with optional authentication."""
+def setup_authentication(mcp_instance: FastMCP, auth_enable: bool = False, secret_key: str = ""):
+    """Setup authentication for existing MCP instance."""
     
     if auth_enable and secret_key:
         # Simple token-based authentication using StaticTokenVerifier
         # This is much simpler than JWT with RSA keys
-        logger.info("Creating MCP instance with Bearer token authentication")
+        logger.info("Setting up Bearer token authentication on existing MCP instance")
         
         # Create token configuration
         # The key is the token, the value contains metadata about the token
@@ -63,12 +63,13 @@ def create_mcp_instance(auth_enable: bool = False, secret_key: str = "") -> Fast
         }
         
         auth = StaticTokenVerifier(tokens=tokens)
-        return FastMCP("ambari-api", auth=auth)
+        # Update the auth property on the existing instance
+        mcp_instance._auth = auth
+        logger.info("Authentication successfully configured")
     else:
-        logger.info("Creating MCP instance without authentication")
-        return FastMCP("ambari-api")
+        logger.info("No authentication configured - server will accept all requests")
 
-# Initialize with default (no auth) - will be recreated in main() if needed
+# Initialize the main MCP instance (this will have all tools registered via decorators)
 mcp = FastMCP("ambari-api")
 
 # =============================================================================
@@ -2361,9 +2362,8 @@ def main(argv: Optional[List[str]] = None):
             logger.warning("This server will accept requests without Bearer token verification.")
             logger.warning("Set REMOTE_AUTH_ENABLE=true and REMOTE_SECRET_KEY to enable authentication.")
     
-    # Create MCP instance with or without authentication
-    global mcp
-    mcp = create_mcp_instance(auth_enable=auth_enable, secret_key=secret_key)
+    # Setup authentication on the global MCP instance (which already has all tools registered)
+    setup_authentication(mcp, auth_enable=auth_enable, secret_key=secret_key)
 
     # Transport 모드에 따른 실행
     if transport_type == "streamable-http":
