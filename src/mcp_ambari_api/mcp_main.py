@@ -40,44 +40,7 @@ logger = logging.getLogger("AmbariService")
 
 # =============================================================================
 
-# =============================================================================
-# Server Initialization & Remote Auth Middleware
-# =============================================================================
 mcp = FastMCP("ambari-api")
-
-# --- Remote Auth Middleware (streamable-http only) ---
-import functools
-from starlette.requests import Request
-from starlette.responses import JSONResponse
-from starlette.status import HTTP_401_UNAUTHORIZED
-
-REMOTE_AUTH_ENABLE = os.getenv("REMOTE_AUTH_ENABLE", "false").lower() == "true"
-REMOTE_SECRET_KEY = os.getenv("REMOTE_SECRET_KEY", "")
-
-def remote_auth_required(func):
-    @functools.wraps(func)
-    async def wrapper(request: Request, *args, **kwargs):
-        # Only enforce if enabled and streamable-http
-        if REMOTE_AUTH_ENABLE and request.scope.get("type") == "http":
-            auth_header = request.headers.get("authorization")
-            if not auth_header or not auth_header.startswith("Bearer "):
-                return JSONResponse({"error": "Missing or invalid Authorization header"}, status_code=HTTP_401_UNAUTHORIZED)
-            token = auth_header.split(" ", 1)[1]
-            if token != REMOTE_SECRET_KEY:
-                return JSONResponse({"error": "Invalid token"}, status_code=HTTP_401_UNAUTHORIZED)
-        return await func(request, *args, **kwargs)
-    return wrapper
-
-# Register middleware for all HTTP endpoints if needed
-if REMOTE_AUTH_ENABLE:
-    try:
-        from fastmcp.server import app as fastapi_app
-        # Patch all routes to require auth
-        for route in fastapi_app.routes:
-            if hasattr(route, "endpoint"):
-                route.endpoint = remote_auth_required(route.endpoint)
-    except Exception as e:
-        logger.warning(f"Could not patch FastMCP app for remote auth: {e}")
 
 # =============================================================================
 # Constants
