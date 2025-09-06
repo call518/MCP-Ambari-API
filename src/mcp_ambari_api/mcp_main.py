@@ -43,34 +43,30 @@ logger = logging.getLogger("AmbariService")
 # Authentication Setup
 # =============================================================================
 
-def setup_authentication(mcp_instance: FastMCP, auth_enable: bool = False, secret_key: str = ""):
-    """Setup authentication for existing MCP instance."""
-    
-    if auth_enable and secret_key:
-        # Simple token-based authentication using StaticTokenVerifier
-        # This is much simpler than JWT with RSA keys
-        logger.info("Setting up Bearer token authentication on existing MCP instance")
-        
-        # Create token configuration
-        # The key is the token, the value contains metadata about the token
-        tokens = {
-            secret_key: {
-                "client_id": "ambari-api-client",
-                "user": "admin",
-                "scopes": ["read", "write"],
-                "description": "Ambari API access token"
-            }
-        }
-        
-        auth = StaticTokenVerifier(tokens=tokens)
-        # Update the auth property on the existing instance
-        mcp_instance._auth = auth
-        logger.info("Authentication successfully configured")
-    else:
-        logger.info("No authentication configured - server will accept all requests")
+# Check environment variables for authentication early
+_auth_enable = os.environ.get("REMOTE_AUTH_ENABLE", "false").lower() == "true"
+_secret_key = os.environ.get("REMOTE_SECRET_KEY", "")
 
-# Initialize the main MCP instance (this will have all tools registered via decorators)
-mcp = FastMCP("ambari-api")
+# Initialize the main MCP instance with authentication if configured
+if _auth_enable and _secret_key:
+    logger.info("Initializing MCP instance with Bearer token authentication (from environment)")
+    
+    # Create token configuration
+    tokens = {
+        _secret_key: {
+            "client_id": "ambari-api-client",
+            "user": "admin",
+            "scopes": ["read", "write"],
+            "description": "Ambari API access token"
+        }
+    }
+    
+    auth = StaticTokenVerifier(tokens=tokens)
+    mcp = FastMCP("ambari-api", auth=auth)
+    logger.info("MCP instance initialized with authentication")
+else:
+    logger.info("Initializing MCP instance without authentication")
+    mcp = FastMCP("ambari-api")
 
 # =============================================================================
 # Constants
@@ -2282,6 +2278,8 @@ def main(argv: Optional[List[str]] = None):
     Supports optional CLI arguments (e.g. --log-level DEBUG) while remaining
     backward-compatible with stdio launcher expectations.
     """
+    global mcp
+    
     parser = argparse.ArgumentParser(prog="mcp-aambari-api", description="MCP Ambari API Server")
     parser.add_argument(
         "--log-level",
@@ -2361,9 +2359,12 @@ def main(argv: Optional[List[str]] = None):
             logger.warning("WARNING: streamable-http mode without authentication enabled!")
             logger.warning("This server will accept requests without Bearer token verification.")
             logger.warning("Set REMOTE_AUTH_ENABLE=true and REMOTE_SECRET_KEY to enable authentication.")
-    
-    # Setup authentication on the global MCP instance (which already has all tools registered)
-    setup_authentication(mcp, auth_enable=auth_enable, secret_key=secret_key)
+
+    # Note: MCP instance with authentication is already initialized at module level
+    # based on environment variables. CLI arguments will override if different.
+    if auth_enable != _auth_enable or secret_key != _secret_key:
+        logger.warning("CLI authentication settings differ from environment variables.")
+        logger.warning("Environment settings take precedence during module initialization.")
 
     # Transport 모드에 따른 실행
     if transport_type == "streamable-http":
