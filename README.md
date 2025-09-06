@@ -278,6 +278,14 @@ This MCP server supports two connection modes: **stdio** (traditional) and **str
 | `DOCKER_EXTERNAL_PORT_OPENWEBUI` | Host port mapping for Open WebUI container | `8080` | `3001` |
 | `DOCKER_EXTERNAL_PORT_MCP_SERVER` | Host port mapping for MCP server container | `8080` | `18001` |
 | `DOCKER_EXTERNAL_PORT_MCPO_PROXY` | Host port mapping for MCPO proxy container | `8000` | `8001` |
+| `REMOTE_AUTH_ENABLE` | Enable token auth for streamable-http mode (`true`/`false`) | `false` | `false` |
+| `REMOTE_SECRET_KEY` | Bearer token for remote auth (streamable-http mode) | `changeme` | `changeme` |
+
+
+**Remote Auth (streamable-http mode only):**
+- If `REMOTE_AUTH_ENABLE=true` and `FASTMCP_TYPE=streamable-http`, all HTTP requests must include an `Authorization: Bearer <REMOTE_SECRET_KEY>` header.
+- If disabled or in stdio mode, no token check is performed.
+- Set a strong `REMOTE_SECRET_KEY` in production for security.
 
 **Note**: `AMBARI_CLUSTER_NAME` serves as the default target cluster for operations when no specific cluster is specified. All environment variables can be configured via the `.env` file. 
 
@@ -350,16 +358,23 @@ AMBARI_CLUSTER_NAME=your-cluster-name
 
 **On MCP-Client Host:**
 
+
 ```json
 {
   "mcpServers": {
     "ambari-api": {
       "type": "streamable-http",
-      "url": "http://localhost:8000/mcp"
+      "url": "http://localhost:8000/mcp",
+      "headers": {
+        "Authorization": "Bearer <REMOTE_SECRET_KEY>"
+      }
     }
   }
 }
 ```
+
+> **Note:**
+> If you enable bearer token authentication (`REMOTE_AUTH_ENABLE=true`), you must add the `headers` section as above to your `mcp-config.json` (or equivalent client config) and set the value to match your `REMOTE_SECRET_KEY`.
 
 ---
 
