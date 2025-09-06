@@ -2373,6 +2373,3 @@ def main(argv: Optional[List[str]] = None):
     else:
         logger.info("Starting stdio transport for local usage")
         mcp.run(transport='stdio')
-
-if __name__ == "__main__":
-    main()

@@ -23,4 +23,4 @@ echo "  REMOTE_AUTH_ENABLE: ${REMOTE_AUTH_ENABLE}"
 echo "  AMBARI_HOST: ${AMBARI_HOST}"
 echo "  AMBARI_PORT: ${AMBARI_PORT}"
 
-python -m mcp_ambari_api.mcp_main --type ${FASTMCP_TYPE} --host ${FASTMCP_HOST} --port ${FASTMCP_PORT}
+python -m mcp_ambari_api --type ${FASTMCP_TYPE} --host ${FASTMCP_HOST} --port ${FASTMCP_PORT}
