@@ -2,7 +2,7 @@
   "mcpServers": {
     "ambari-api": {
       "command": "python",
-      "args": ["-m", "mcp_ambari_api.ambari_api"],
+      "args": ["-m", "mcp_ambari_api.mcp_main"],
       "env": {
         "PYTHONPATH": "/app/src",
         "AMBARI_HOST": "host.docker.internal",

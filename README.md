@@ -602,7 +602,7 @@ We're always excited to welcome new contributors! Whether you're fixing a typo, 
 - 🚀 Submit pull requests
 - ⭐ Star the repo if you find it useful!
 
-**Pro tip:** The codebase is designed to be super friendly for adding new tools. Check out the existing `@mcp.tool()` functions in `ambari_api.py`.
+**Pro tip:** The codebase is designed to be super friendly for adding new tools. Check out the existing `@mcp.tool()` functions in `mcp_main.py`.
 
 ---
 

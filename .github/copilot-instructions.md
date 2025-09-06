@@ -5,7 +5,7 @@ This MCP server supports dual transport modes with flexible configuration via CL
 - **stdio mode**: Default for local usage (`uvx mcp-ambari-api`)
 - **streamable-http mode**: For Docker/server deployment (`--type streamable-http` or `FASTMCP_TYPE=streamable-http`)
 
-**Priority**: CLI args > Environment vars > Defaults. The `main()` function in `src/mcp_ambari_api/ambari_api.py` (~2181 lines) handles transport selection and runs the FastMCP server.
+**Priority**: CLI args > Environment vars > Defaults. The `main()` function in `src/mcp_ambari_api/mcp_main.py` (~2181 lines) handles transport selection and runs the FastMCP server.
 
 ## Core Patterns
 - **Tool Definition**: Every Ambari operation is an async function with `@mcp.tool()` + `@log_tool` decorators
@@ -19,7 +19,7 @@ This MCP server supports dual transport modes with flexible configuration via CL
 - **Local Testing**: Use `run-mcp-inspector-local.sh` (not `scripts/`) with uv to test tools interactively
 - **Docker Development**: `docker-compose up -d` starts full stack (OpenWebUI + MCP server + MCPO proxy)
 - **Build & Deploy**: Version-specific Docker images via `build-mcp-server-docker-image.sh` and `build-mcpo-server-docker-image.sh`
-- **Package Structure**: Entry point is `mcp-ambari-api` console script → `mcp_ambari_api.ambari_api:main`
+- **Package Structure**: Entry point is `mcp-ambari-api` console script → `mcp_ambari_api.mcp_main:main`
 - **Environment Setup**: Use `PYTHONPATH=./src` for local development, packaged resources in `mcp_ambari_api/prompt_template.md`
 
 ## Configuration Files
@@ -40,7 +40,7 @@ This MCP server supports dual transport modes with flexible configuration via CL
 - Connection failures include timing information for debugging
 
 ## Key Files to Understand
-- `src/mcp_ambari_api/ambari_api.py`: Tool definitions, transport selection, main entrypoint
+- `src/mcp_ambari_api/mcp_main.py`: Tool definitions, transport selection, main entrypoint
 - `src/mcp_ambari_api/functions.py`: `make_ambari_request()`, `@log_tool` decorator, formatting utilities
 - `src/mcp_ambari_api/prompt_template.md`: AI agent decision tree and tool selection guide
 - `docker-compose.yml`: Multi-container orchestration with environment mapping

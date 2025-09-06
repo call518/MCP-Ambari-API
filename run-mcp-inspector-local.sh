@@ -21,4 +21,4 @@ echo "   Log Level: $MCP_LOG_LEVEL"
 echo "   Ambari Host: ${AMBARI_HOST:-localhost}:${AMBARI_PORT:-8080}"
 
 npx -y @modelcontextprotocol/inspector \
-  -- uv run python -m mcp_ambari_api.ambari_api
+  -- uv run python -m mcp_ambari_api.mcp_main
