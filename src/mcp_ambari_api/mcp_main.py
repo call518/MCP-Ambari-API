@@ -6,6 +6,7 @@ MCP tool definitions for Ambari REST API operations.
 from typing import Dict, Optional, List
 import argparse
 from fastmcp import FastMCP
+from fastmcp.server.auth import StaticTokenVerifier
 import os
 import importlib.resources as pkg_resources
 import asyncio  # Add this import at the top of the file to use asyncio.sleep
@@ -39,7 +40,35 @@ logging.basicConfig(
 logger = logging.getLogger("AmbariService")
 
 # =============================================================================
+# Authentication Setup
+# =============================================================================
 
+def create_mcp_instance(auth_enable: bool = False, secret_key: str = "") -> FastMCP:
+    """Create FastMCP instance with optional authentication."""
+    
+    if auth_enable and secret_key:
+        # Simple token-based authentication using StaticTokenVerifier
+        # This is much simpler than JWT with RSA keys
+        logger.info("Creating MCP instance with Bearer token authentication")
+        
+        # Create token configuration
+        # The key is the token, the value contains metadata about the token
+        tokens = {
+            secret_key: {
+                "client_id": "ambari-api-client",
+                "user": "admin",
+                "scopes": ["read", "write"],
+                "description": "Ambari API access token"
+            }
+        }
+        
+        auth = StaticTokenVerifier(tokens=tokens)
+        return FastMCP("ambari-api", auth=auth)
+    else:
+        logger.info("Creating MCP instance without authentication")
+        return FastMCP("ambari-api")
+
+# Initialize with default (no auth) - will be recreated in main() if needed
 mcp = FastMCP("ambari-api")
 
 # =============================================================================
@@ -2276,6 +2305,17 @@ def main(argv: Optional[List[str]] = None):
         type=int,
         help="Port number for streamable-http transport. Default: 8000",
     )
+    parser.add_argument(
+        "--auth-enable",
+        dest="auth_enable",
+        action="store_true",
+        help="Enable Bearer token authentication for streamable-http mode. Default: False",
+    )
+    parser.add_argument(
+        "--secret-key",
+        dest="secret_key",
+        help="Secret key for Bearer token authentication. Required when auth is enabled.",
+    )
     # Allow future extension without breaking unknown args usage
     args = parser.parse_args(argv)
 
@@ -2303,6 +2343,27 @@ def main(argv: Optional[List[str]] = None):
     
     # Port 결정 (간결하게)
     port = args.port or int(os.getenv("FASTMCP_PORT", 8000))
+    
+    # Authentication 설정 결정
+    auth_enable = args.auth_enable or os.getenv("REMOTE_AUTH_ENABLE", "false").lower() in ("true", "1", "yes", "on")
+    secret_key = args.secret_key or os.getenv("REMOTE_SECRET_KEY", "")
+    
+    # Validation for streamable-http mode with authentication
+    if transport_type == "streamable-http":
+        if auth_enable:
+            if not secret_key:
+                logger.error("ERROR: Authentication is enabled but no secret key provided.")
+                logger.error("Please set REMOTE_SECRET_KEY environment variable or use --secret-key argument.")
+                return
+            logger.info("Authentication enabled for streamable-http transport")
+        else:
+            logger.warning("WARNING: streamable-http mode without authentication enabled!")
+            logger.warning("This server will accept requests without Bearer token verification.")
+            logger.warning("Set REMOTE_AUTH_ENABLE=true and REMOTE_SECRET_KEY to enable authentication.")
+    
+    # Create MCP instance with or without authentication
+    global mcp
+    mcp = create_mcp_instance(auth_enable=auth_enable, secret_key=secret_key)
 
     # Transport 모드에 따른 실행
     if transport_type == "streamable-http":

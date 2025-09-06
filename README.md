@@ -70,12 +70,17 @@ Start the `MCP-Server`, `MCPO`(MCP-Proxy for OpenAPI), and `OpenWebUI`.
    ```
 1. **Configure your Ambari connection in `.env` file:**
    ```bash
-   # Example values provided
+   # Ambari cluster connection
    AMBARI_HOST=host.docker.internal
    AMBARI_PORT=7070
    AMBARI_USER=admin
    AMBARI_PASS=admin
    AMBARI_CLUSTER_NAME=TEST-AMBARI
+   
+   # (Optional) Enable authentication for streamable-http mode
+   # Recommended for production environments
+   REMOTE_AUTH_ENABLE=false
+   REMOTE_SECRET_KEY=your-secure-secret-key-here
    ```
 1. Run:
    ```bash
@@ -260,6 +265,8 @@ This MCP server supports two connection modes: **stdio** (traditional) and **str
 - `--type` (`-t`): Transport type (`stdio` or `streamable-http`) - Default: `stdio`
 - `--host`: Host address for HTTP transport - Default: `127.0.0.1`  
 - `--port` (`-p`): Port number for HTTP transport - Default: `8000`
+- `--auth-enable`: Enable Bearer token authentication for streamable-http mode - Default: `false`
+- `--secret-key`: Secret key for Bearer token authentication (required when auth enabled)
 
 ### Environment Variables
 
@@ -270,6 +277,8 @@ This MCP server supports two connection modes: **stdio** (traditional) and **str
 | `FASTMCP_TYPE` | MCP transport protocol (stdio for CLI, streamable-http for web) | `stdio` | `streamable-http` |
 | `FASTMCP_HOST` | HTTP server bind address (0.0.0.0 for all interfaces) | `127.0.0.1` | `0.0.0.0` |
 | `FASTMCP_PORT` | HTTP server port for MCP communication | `8000` | `8000` |
+| `REMOTE_AUTH_ENABLE` | Enable Bearer token authentication for streamable-http mode | `false` | `false` |
+| `REMOTE_SECRET_KEY` | Secret key for Bearer token authentication (required when auth enabled) | - | `your-secret-key-here` |
 | `AMBARI_HOST` | Ambari server hostname or IP address | `127.0.0.1` | `host.docker.internal` |
 | `AMBARI_PORT` | Ambari server port number | `8080` | `8080` |
 | `AMBARI_USER` | Username for Ambari server authentication | `admin` | `admin` |
@@ -310,6 +319,71 @@ AMBARI_PASS=your-password
 AMBARI_CLUSTER_NAME=your-cluster-name
 ```
 
+---
+
+## 🔐 Security & Authentication
+
+### Bearer Token Authentication
+
+For `streamable-http` mode, this MCP server supports Bearer token authentication to secure remote access. This is especially important when running the server in production environments.
+
+#### Configuration
+
+**Enable Authentication:**
+
+```bash
+# In .env file
+REMOTE_AUTH_ENABLE=true
+REMOTE_SECRET_KEY=your-secure-secret-key-here
+```
+
+**Or via CLI:**
+
+```bash
+python -m mcp_ambari_api.mcp_main --type streamable-http --auth-enable --secret-key your-secure-secret-key-here
+```
+
+#### Security Levels
+
+1. **stdio mode** (Default): Local-only access, no authentication needed
+2. **streamable-http + REMOTE_AUTH_ENABLE=false**: Remote access without authentication ⚠️ **NOT RECOMMENDED for production**
+3. **streamable-http + REMOTE_AUTH_ENABLE=true**: Remote access with Bearer token authentication ✅ **RECOMMENDED for production**
+
+#### Client Configuration
+
+When authentication is enabled, MCP clients must include the Bearer token in the Authorization header:
+
+```json
+{
+  "mcpServers": {
+    "ambari-api": {
+      "type": "streamable-http",
+      "url": "http://your-server:8000/mcp",
+      "headers": {
+        "Authorization": "Bearer your-secure-secret-key-here"
+      }
+    }
+  }
+}
+```
+
+#### Security Best Practices
+
+- **Always enable authentication** when using streamable-http mode in production
+- **Use strong, randomly generated secret keys** (32+ characters recommended)
+- **Use HTTPS** when possible (configure reverse proxy with SSL/TLS)
+- **Restrict network access** using firewalls or network policies
+- **Rotate secret keys regularly** for enhanced security
+- **Monitor access logs** for unauthorized access attempts
+
+#### Error Handling
+
+When authentication fails, the server returns:
+- **401 Unauthorized** for missing or invalid tokens
+- **Detailed error messages** in JSON format for debugging
+
+---
+
 ### Method 1: Local MCP (transport="stdio")
 
 ```json
@@ -341,6 +415,22 @@ AMBARI_CLUSTER_NAME=your-cluster-name
     "ambari-api": {
       "type": "streamable-http",
       "url": "http://localhost:18001/mcp"
+    }
+  }
+}
+```
+
+**With Bearer Token Authentication (Recommended for production):**
+
+```json
+{
+  "mcpServers": {
+    "ambari-api": {
+      "type": "streamable-http", 
+      "url": "http://localhost:18001/mcp",
+      "headers": {
+        "Authorization": "Bearer your-secure-secret-key-here"
+      }
     }
   }
 }
@@ -400,6 +490,22 @@ AMBARI_CLUSTER_NAME=your-cluster-name
         "AMBARI_PASS": "admin-pass",
         "AMBARI_CLUSTER_NAME": "AMBARI-B",
         "MCP_LOG_LEVEL": "INFO"
+      }
+    }
+  }
+}
+```
+
+**Remote Access with Authentication (Claude Desktop):**
+
+```json
+{
+  "mcpServers": {
+    "ambari-api-remote": {
+      "type": "streamable-http",
+      "url": "http://your-server-ip:18001/mcp",
+      "headers": {
+        "Authorization": "Bearer your-secure-secret-key-here"
       }
     }
   }
