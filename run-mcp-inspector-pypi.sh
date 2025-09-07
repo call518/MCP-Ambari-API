@@ -1,13 +1,20 @@
 #!/bin/bash
 set -euo pipefail
 
-# (NOTE) 로컬 소스가 아닌 Pypi에 배포된  패키지로 기동됨.
+# Run MCP Inspector with published package from PyPI
+cd "$(dirname "$0")/.."
+
+echo "🔍 Starting MCP Inspector with published package..."
+echo "📦 Package: mcp-ambari-api"
+
+# Check if package name has been customized
+if grep -q "mcp-ambari-api" pyproject.toml; then
+    echo "⚠️  Warning: Package name 'mcp-ambari-api' hasn't been customized."
+    echo "   Run ./scripts/rename-template.sh first to customize the package."
+    echo ""
+fi
+
+echo "🚀 Launching MCP Inspector with uvx..."
 
 npx -y @modelcontextprotocol/inspector \
-	-e AMBARI_HOST='127.0.0.1' \
-	-e AMBARI_PORT=8080 \
-	-e AMBARI_USER='admin' \
-	-e AMBARI_PASS='admin' \
-	-e AMBARI_CLUSTER_NAME='TEST-AMBARI' \
-	-e MCP_LOG_LEVEL='INFO' \
-	-- uvx mcp-ambari-api
+  -- uvx mcp-ambari-api

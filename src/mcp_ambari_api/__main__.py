@@ -8,7 +8,7 @@ Instead of:
     python -m mcp_ambari_api.mcp_main
 """
 
-from mcp_ambari_api.mcp_main import main
+from .mcp_main import main
 
 if __name__ == "__main__":
     main()
