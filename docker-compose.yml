@@ -17,17 +17,6 @@ services:
     container_name: mcp-ambari-api-mcp-server
     ports:
       - "${DOCKER_EXTERNAL_PORT_MCP_SERVER}:8000" ### (WARNING) Must be same with port number of 'FASTMCP_PORT', 'mcp-config.json' and 'mcp-config.json.http'
-    environment:
-      - PYTHONPATH=${PYTHONPATH}
-      - FASTMCP_TYPE=${FASTMCP_TYPE}
-      - FASTMCP_HOST=${FASTMCP_HOST}
-      - FASTMCP_PORT=${FASTMCP_PORT}
-      - AMBARI_HOST=${AMBARI_HOST}
-      - AMBARI_PORT=${AMBARI_PORT}
-      - AMBARI_USER=${AMBARI_USER}
-      - AMBARI_PASS=${AMBARI_PASS}
-      - AMBARI_CLUSTER_NAME=${AMBARI_CLUSTER_NAME}
-      - MCP_LOG_LEVEL=${MCP_LOG_LEVEL}
     volumes:
       - ./src:/app/src/
       - ./scripts:/app/scripts
