@@ -277,8 +277,8 @@ This MCP server supports two connection modes: **stdio** (traditional) and **str
 | `FASTMCP_TYPE` | MCP transport protocol (stdio for CLI, streamable-http for web) | `stdio` | `streamable-http` |
 | `FASTMCP_HOST` | HTTP server bind address (0.0.0.0 for all interfaces) | `127.0.0.1` | `0.0.0.0` |
 | `FASTMCP_PORT` | HTTP server port for MCP communication | `8000` | `8000` |
-| `REMOTE_AUTH_ENABLE` | Enable Bearer token authentication for streamable-http mode | `false` | `false` |
-| `REMOTE_SECRET_KEY` | Secret key for Bearer token authentication (required when auth enabled) | - | `your-secret-key-here` |
+| `REMOTE_AUTH_ENABLE` | Enable Bearer token authentication for streamable-http mode<br/>**Default: false** (if undefined, empty, or null) | `false` | `false` |
+| `REMOTE_SECRET_KEY` | Secret key for Bearer token authentication<br/>**Required when REMOTE_AUTH_ENABLE=true** | - | `your-secret-key-here` |
 | `AMBARI_HOST` | Ambari server hostname or IP address | `127.0.0.1` | `host.docker.internal` |
 | `AMBARI_PORT` | Ambari server port number | `8080` | `8080` |
 | `AMBARI_USER` | Username for Ambari server authentication | `admin` | `admin` |
@@ -346,8 +346,10 @@ python -m mcp_ambari_api --type streamable-http --auth-enable --secret-key your-
 #### Security Levels
 
 1. **stdio mode** (Default): Local-only access, no authentication needed
-2. **streamable-http + REMOTE_AUTH_ENABLE=false**: Remote access without authentication ⚠️ **NOT RECOMMENDED for production**
+2. **streamable-http + REMOTE_AUTH_ENABLE=false/undefined**: Remote access without authentication ⚠️ **NOT RECOMMENDED for production**
 3. **streamable-http + REMOTE_AUTH_ENABLE=true**: Remote access with Bearer token authentication ✅ **RECOMMENDED for production**
+
+> **🔒 Default Policy**: `REMOTE_AUTH_ENABLE` defaults to `false` if undefined, empty, or null. This ensures the server starts even without explicit authentication configuration.
 
 #### Client Configuration
 
