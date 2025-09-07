@@ -340,7 +340,7 @@ REMOTE_SECRET_KEY=your-secure-secret-key-here
 **Or via CLI:**
 
 ```bash
-python -m mcp_ambari_api.mcp_main --type streamable-http --auth-enable --secret-key your-secure-secret-key-here
+python -m mcp_ambari_api --type streamable-http --auth-enable --secret-key your-secure-secret-key-here
 ```
 
 #### Security Levels
