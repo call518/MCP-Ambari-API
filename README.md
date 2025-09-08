@@ -46,9 +46,9 @@
 
 > **Note:** The following instructions assume you are using the `streamable-http` mode for MCP Server.
 
-### Env
+### Flow Diagram of Quickstart/Tutorial
 
-- Ambari-3.0 Cluster
+![Flow Diagram of Quickstart/Tutorial](img/MCP-Workflow-of-Quickstart-Tutorial.png)
 
 ### 1. Prepare Ambari Cluster (Test Target)
 
