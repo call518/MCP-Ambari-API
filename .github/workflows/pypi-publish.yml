@@ -26,7 +26,7 @@ jobs:
         run: sed -i "s|^version = \".*\"|version = \"${VERSION}\"|" pyproject.toml
       # - name: Replace mcp-config.json for PyPI
       #   run: cp -f mcp-config.json.pypi mcp-config.json
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.11.x"
       - name: Install build tool
