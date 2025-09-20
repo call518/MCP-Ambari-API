@@ -1,5 +1,6 @@
 services:
   open-webui:
+    env_file: .env
     image: ghcr.io/open-webui/open-webui:main
     container_name: mcp-ambari-api-open-webui
     ports:
@@ -13,6 +14,7 @@ services:
     restart: unless-stopped
 
   mcp-server:
+    env_file: .env
     image: call518/mcp-server-ambari-api:1.0.0
     container_name: mcp-ambari-api-mcp-server
     ports:
@@ -32,6 +34,7 @@ services:
       start_period: 10s
 
   mcpo-proxy:
+    env_file: .env
     image: call518/mcpo-proxy-ambari-api:1.0.2
     container_name: mcp-ambari-api-mcpo-proxy
     depends_on:
