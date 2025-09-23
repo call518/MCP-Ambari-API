@@ -56,6 +56,7 @@ Every tool call triggers a real Ambari REST API request. Call tools ONLY when ne
 | Curated metrics catalog / quick search | list_common_metrics_catalog | Highlighted metrics per app + keyword search | Defaults to ambari_server/namenode/datanode/nodemanager/resourcemanager |
 | Ambari metrics catalog / metric discovery | list_ambari_metrics_metadata | Metric metadata (units, scope) | Narrow with app_id/metric/host filters |
 | Ambari metrics trends / time series | query_ambari_metrics | Summaries + optional datapoints | Provide metricNames + duration/start/end |
+| DFS admin-style capacity report | hdfs_dfadmin_report | Cluster capacity + DataNode status summary | Recreates `hdfs dfsadmin -report` via metrics |
 | Get prompt template | get_prompt_template | Template sections | For AI system prompts |
 | Template full content | prompt_template_full | Complete template | Internal use |
 | Template section headings | prompt_template_headings | Section titles | Internal use |
@@ -334,6 +335,11 @@ Any suggestion to check elsewhere manually instead of using the API tools.
 - "Check DataNode bytes written in the last 30 minutes."
 - "Show ResourceManager root queue pending MB for the past day."
 - 💡 **Tip**: metric names are auto-matched from the catalog; override the inferred granularity with `precision` if you need explicit `SECONDS` / `MINUTES` / `HOURS`.
+
+**hdfs_dfadmin_report**
+- "Show the HDFS dfsadmin report."
+- "Summarize NameNode capacity and DataNode usage like dfsadmin."
+- 💡 **Tip**: Uses AMS metrics; include `cluster_name` when monitoring multiple clusters.
 
 ### 📚 System Information
 

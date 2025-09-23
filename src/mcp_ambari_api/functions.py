@@ -478,7 +478,7 @@ def parse_metrics_metadata(response_obj: Any) -> List[Dict[str, Any]]:
             entries.append(entry)
     elif isinstance(section, list):
         entries = [entry for entry in section if isinstance(entry, dict)]
-    return entries
+        return entries
 
 
 def _metadata_cache_key(app_id: Optional[str]) -> str:
@@ -707,6 +707,62 @@ def infer_precision_for_window(duration_ms: Optional[int]) -> Optional[str]:
             return precision
 
     return None
+
+
+async def fetch_metric_series(
+    metric_name: str,
+    app_id: Optional[str] = None,
+    hostnames: Optional[str] = None,
+    duration_ms: int = 10 * 60 * 1000,
+) -> List[Dict[str, float]]:
+    """Fetch a time-series for the given metric within the specified lookback window."""
+
+    now_ms = int(datetime.datetime.now(datetime.timezone.utc).timestamp() * 1000)
+    start_ms = max(0, now_ms - duration_ms)
+
+    params: Dict[str, Any] = {
+        "metricNames": metric_name,
+        "startTime": start_ms,
+        "endTime": now_ms,
+    }
+
+    if app_id:
+        params["appId"] = app_id
+    if hostnames:
+        params["hostname"] = hostnames
+
+    response = await make_ambari_metrics_request("/metrics", params=params)
+    if response is None or isinstance(response, dict) and response.get("error"):
+        return []  # fallback to empty series
+
+    metrics_section = []
+    if isinstance(response, dict):
+        metrics_section = response.get("metrics") or response.get("Metrics") or []
+    elif isinstance(response, list):
+        metrics_section = response
+
+    if not metrics_section:
+        return []
+
+    series_container = metrics_section[0] if isinstance(metrics_section, list) else metrics_section
+    if not isinstance(series_container, dict):
+        return []
+
+    return metrics_map_to_series(series_container.get("metrics", {}))
+
+
+async def fetch_latest_metric_value(
+    metric_name: str,
+    app_id: Optional[str] = None,
+    hostnames: Optional[str] = None,
+    duration_ms: int = 10 * 60 * 1000,
+) -> Optional[float]:
+    """Fetch the latest datapoint for a metric within the lookback window."""
+
+    series = await fetch_metric_series(metric_name, app_id=app_id, hostnames=hostnames, duration_ms=duration_ms)
+    if not series:
+        return None
+    return series[-1]["value"]
 
 async def format_single_host_details(host_name: str, cluster_name: str, show_header: bool = True) -> str:
     """

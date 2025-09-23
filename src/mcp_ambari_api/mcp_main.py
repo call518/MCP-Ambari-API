@@ -32,6 +32,7 @@ from mcp_ambari_api.functions import (
     find_curated_metric,
     get_metrics_metadata,
     infer_precision_for_window,
+    fetch_latest_metric_value,
 )
 from mcp_ambari_api.metrics_catalog import iter_catalog_entries, CURATED_METRICS, rank_catalog_matches
 # from .functions import (
@@ -2382,6 +2383,270 @@ async def list_common_metrics_catalog(
     header_lines.append("")
     header_lines.append("Tip: Provide search='heap usage' or similar to narrow the catalog.")
     return "\n".join(header_lines)
+
+
+@mcp.tool(title="HDFS DFSAdmin Report")
+@log_tool
+async def hdfs_dfadmin_report(
+    cluster_name: Optional[str] = None,
+    lookback_minutes: int = 10,
+) -> str:
+    """Produce a DFSAdmin-style capacity and DataNode report using Ambari metrics."""
+
+    target_cluster = cluster_name or AMBARI_CLUSTER_NAME
+    lookback_ms = max(1, lookback_minutes) * 60 * 1000
+
+    # Helper functions -----------------------------------------------------
+    def format_bytes(value: Optional[float]) -> str:
+        if value is None:
+            return "N/A"
+        units = ["B", "KB", "MB", "GB", "TB", "PB"]
+        size = float(value)
+        idx = 0
+        while size >= 1024 and idx < len(units) - 1:
+            size /= 1024.0
+            idx += 1
+        return f"{size:.2f} {units[idx]}"
+
+    def safe_percent(numerator: Optional[float], denominator: Optional[float]) -> str:
+        if numerator is None or denominator in (None, 0):
+            return "N/A"
+        try:
+            pct = (float(numerator) / float(denominator)) * 100.0
+            return f"{pct:.2f}%"
+        except ZeroDivisionError:
+            return "N/A"
+
+    def to_float(value: Any) -> Optional[float]:
+        if value is None:
+            return None
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return None
+
+    # Cluster-level metrics via AMS ---------------------------------------
+    capacity_metrics = {
+        "configured_capacity": "dfs.FSNamesystem.CapacityTotal",
+        "dfs_used": "dfs.FSNamesystem.CapacityUsed",
+        "dfs_remaining": "dfs.FSNamesystem.CapacityRemaining",
+        "non_dfs_used": "dfs.FSNamesystem.CapacityUsedNonDFS",
+        "under_replicated": "dfs.FSNamesystem.UnderReplicatedBlocks",
+        "corrupt_replicas": "dfs.FSNamesystem.CorruptBlocks",
+        "missing_blocks": "dfs.FSNamesystem.MissingBlocks",
+        "missing_blocks_repl_one": "dfs.FSNamesystem.MissingReplOneBlocks",
+        "lowest_priority_redundancy": "dfs.FSNamesystem.LowRedundancyBlocks",
+        "pending_deletion": "dfs.namenode.PendingDeleteBlocksCount",
+        "ec_low_redundancy": "dfs.FSNamesystem.LowRedundancyECBlockGroups",
+        "ec_corrupt": "dfs.FSNamesystem.CorruptECBlockGroups",
+        "ec_missing": "dfs.FSNamesystem.MissingECBlockGroups",
+        "ec_pending_deletion": "dfs.FSNamesystem.PendingDeletionECBlocks",
+    }
+
+    cluster_values: Dict[str, Optional[float]] = {}
+    for key, metric in capacity_metrics.items():
+        value = await fetch_latest_metric_value(metric, app_id="namenode", duration_ms=lookback_ms)
+        cluster_values[key] = value
+
+    configured = to_float(cluster_values.get("configured_capacity"))
+    dfs_used = to_float(cluster_values.get("dfs_used")) or 0.0
+    dfs_remaining = to_float(cluster_values.get("dfs_remaining")) or 0.0
+    present_capacity = dfs_used + dfs_remaining
+
+    lines: List[str] = []
+    lines.append(f"HDFS DFSAdmin Report (cluster: {target_cluster})")
+    lines.append("=" * 72)
+    lines.append(f"Configured Capacity: {format_bytes(configured)}")
+    lines.append(f"Present Capacity: {format_bytes(present_capacity)}")
+    lines.append(f"DFS Remaining: {format_bytes(dfs_remaining)}")
+    lines.append(f"DFS Used: {format_bytes(dfs_used)}")
+    lines.append(f"DFS Used%: {safe_percent(dfs_used, present_capacity)}")
+
+    lines.append("Replicated Blocks:")
+    lines.append(f"    Under replicated blocks: {int(cluster_values.get('under_replicated') or 0)}")
+    lines.append(f"    Blocks with corrupt replicas: {int(cluster_values.get('corrupt_replicas') or 0)}")
+    lines.append(f"    Missing blocks: {int(cluster_values.get('missing_blocks') or 0)}")
+    lines.append(f"    Missing blocks (replication factor 1): {int(cluster_values.get('missing_blocks_repl_one') or 0)}")
+    lines.append(f"    Low redundancy blocks with highest priority to recover: {int(cluster_values.get('lowest_priority_redundancy') or 0)}")
+    lines.append(f"    Pending deletion blocks: {int(cluster_values.get('pending_deletion') or 0)}")
+
+    lines.append("Erasure Coded Block Groups:")
+    lines.append(f"    Low redundancy block groups: {int(cluster_values.get('ec_low_redundancy') or 0)}")
+    lines.append(f"    Block groups with corrupt internal blocks: {int(cluster_values.get('ec_corrupt') or 0)}")
+    lines.append(f"    Missing block groups: {int(cluster_values.get('ec_missing') or 0)}")
+    lines.append(f"    Pending deletion blocks: {int(cluster_values.get('ec_pending_deletion') or 0)}")
+
+    # DataNode inventory ---------------------------------------------------
+    lines.append("")
+    lines.append("-" * 72)
+
+    hosts_resp = await make_ambari_request(
+        f"/clusters/{target_cluster}/hosts?fields=Hosts/host_name,Hosts/public_host_name,Hosts/ip,host_components/HostRoles/component_name",
+        method="GET",
+    )
+
+    datanode_hosts: List[Dict[str, Any]] = []
+    if hosts_resp and not hosts_resp.get("error"):
+        for item in hosts_resp.get("items", []):
+            host_components = item.get("host_components", [])
+            component_names = {comp.get("HostRoles", {}).get("component_name") for comp in host_components}
+            if "DATANODE" in component_names:
+                datanode_hosts.append(item)
+
+    if datanode_hosts:
+        lines.append(f"Live datanodes ({len(datanode_hosts)}):")
+        for host_item in datanode_hosts:
+            host_info = host_item.get("Hosts", {})
+            host_name = host_info.get("host_name") or host_info.get("public_host_name") or host_info.get("ip") or "<unknown>"
+            public_name = host_info.get("public_host_name") or host_name
+            ip_addr = host_info.get("ip")
+            ams_host_filter = public_name or host_name or ip_addr
+
+            detail_resp = await make_ambari_request(
+                f"/clusters/{target_cluster}/hosts/{host_name}?fields=Hosts/ip,Hosts/public_host_name,Hosts/last_heartbeat_time,metrics/cpu,metrics/memory,metrics/dfs,metrics/disk,metrics/network",
+                method="GET",
+            )
+
+            if not detail_resp or detail_resp.get("error"):
+                detail_resp = host_item
+
+            host_metrics = detail_resp.get("metrics", {}) if detail_resp else {}
+            dfs_metrics = host_metrics.get("dfs", {}) if isinstance(host_metrics, dict) else {}
+
+            capacity_total = to_float(dfs_metrics.get("FSCapacityTotalBytes") or dfs_metrics.get("FSCapacityTotal"))
+            dfs_used_host = to_float(dfs_metrics.get("FSUsedBytes") or dfs_metrics.get("FSUsed"))
+            dfs_remaining_host = to_float(dfs_metrics.get("FSRemainingBytes") or dfs_metrics.get("FSRemaining"))
+            non_dfs_used = to_float(dfs_metrics.get("NonDFSUsedBytes") or dfs_metrics.get("NonDFSUsed"))
+
+            if capacity_total is None:
+                capacity_total = await fetch_latest_metric_value(
+                    "FSDatasetState.org.apache.hadoop.hdfs.server.datanode.fsdataset.impl.FsDatasetImpl.Capacity",
+                    app_id="datanode",
+                    hostnames=ams_host_filter,
+                    duration_ms=lookback_ms,
+                )
+            if dfs_used_host is None:
+                dfs_used_host = await fetch_latest_metric_value(
+                    "FSDatasetState.org.apache.hadoop.hdfs.server.datanode.fsdataset.impl.FsDatasetImpl.DfsUsed",
+                    app_id="datanode",
+                    hostnames=ams_host_filter,
+                    duration_ms=lookback_ms,
+                )
+            if dfs_remaining_host is None:
+                dfs_remaining_host = await fetch_latest_metric_value(
+                    "FSDatasetState.org.apache.hadoop.hdfs.server.datanode.fsdataset.impl.FsDatasetImpl.Remaining",
+                    app_id="datanode",
+                    hostnames=ams_host_filter,
+                    duration_ms=lookback_ms,
+                )
+
+            if non_dfs_used is None and all(v is not None for v in (capacity_total, dfs_used_host, dfs_remaining_host)):
+                non_dfs_used = max(capacity_total - dfs_used_host - dfs_remaining_host, 0)
+            if non_dfs_used is None:
+                disk_metrics = host_metrics.get("disk", {}) if isinstance(host_metrics, dict) else {}
+                disk_total = to_float(disk_metrics.get("disk_total"))
+                disk_free = to_float(disk_metrics.get("disk_free"))
+                if disk_total is not None and disk_free is not None and dfs_used_host is not None:
+                    non_dfs_used = max(disk_total - disk_free - dfs_used_host, 0)
+
+            dfs_used_pct = safe_percent(dfs_used_host, capacity_total)
+            dfs_remaining_pct = safe_percent(dfs_remaining_host, capacity_total)
+
+            lines.append("")
+            if host_name and host_name != ip_addr:
+                lines.append(f"Name: {host_name}")
+            lines.append(f"Hostname: {public_name}")
+            if ip_addr:
+                lines.append(f"IP Address: {ip_addr}")
+            if ip_addr:
+                lines.append(f"IP Address: {ip_addr}")
+            lines.append("Decommission Status : Normal")
+            lines.append(f"Configured Capacity: {format_bytes(capacity_total)}")
+            lines.append(f"DFS Used: {format_bytes(dfs_used_host)}")
+            lines.append(f"Non DFS Used: {format_bytes(non_dfs_used)}")
+            lines.append(f"DFS Remaining: {format_bytes(dfs_remaining_host)}")
+            lines.append(f"DFS Used%: {dfs_used_pct}")
+            lines.append(f"DFS Remaining%: {dfs_remaining_pct}")
+            lines.append("Configured Cache Capacity: 0 (0 B)")
+            lines.append("Cache Used: 0 (0 B)")
+            lines.append("Cache Remaining: 0 (0 B)")
+            lines.append("Cache Used%: 0.00%")
+            lines.append("Cache Remaining%: 0.00%")
+
+            xceivers = await fetch_latest_metric_value(
+                "dfs.datanode.DataNodeActiveXceiversCount",
+                app_id="datanode",
+                hostnames=ams_host_filter,
+                duration_ms=lookback_ms,
+            )
+            if xceivers is not None:
+                lines.append(f"Active Xceivers: {int(xceivers)}")
+
+            block_metric_map = [
+                ("Blocks read", "dfs.datanode.BlocksRead"),
+                ("Blocks written", "dfs.datanode.BlocksWritten"),
+                ("Blocks replicated", "dfs.datanode.BlocksReplicated"),
+                ("Blocks removed", "dfs.datanode.BlocksRemoved"),
+                ("Blocks cached", "dfs.datanode.BlocksCached"),
+                ("Blocks uncached", "dfs.datanode.BlocksUncached"),
+                ("Blocks in pending IBR", "dfs.datanode.BlocksInPendingIBR"),
+                ("Blocks receiving (pending IBR)", "dfs.datanode.BlocksReceivingInPendingIBR"),
+                ("Blocks received (pending IBR)", "dfs.datanode.BlocksReceivedInPendingIBR"),
+                ("Blocks deleted (pending IBR)", "dfs.datanode.BlocksDeletedInPendingIBR"),
+                ("Blocks verified", "dfs.datanode.BlocksVerified"),
+                ("Block verification failures", "dfs.datanode.BlockVerificationFailures"),
+                ("Block checksum avg time", "dfs.datanode.BlockChecksumOpAvgTime"),
+                ("Block checksum ops", "dfs.datanode.BlockChecksumOpNumOps"),
+                ("Block reports avg time", "dfs.datanode.BlockReportsAvgTime"),
+                ("Block reports ops", "dfs.datanode.BlockReportsNumOps"),
+                ("Copy block avg time", "dfs.datanode.CopyBlockOpAvgTime"),
+                ("Copy block ops", "dfs.datanode.CopyBlockOpNumOps"),
+                ("Block recovery worker count", "dfs.datanode.DataNodeBlockRecoveryWorkerCount"),
+                ("Incremental block reports avg time", "dfs.datanode.IncrementalBlockReportsAvgTime"),
+                ("Incremental block reports ops", "dfs.datanode.IncrementalBlockReportsNumOps"),
+                ("RamDisk blocks deleted before lazy persisted", "dfs.datanode.RamDiskBlocksDeletedBeforeLazyPersisted"),
+                ("RamDisk blocks evicted", "dfs.datanode.RamDiskBlocksEvicted"),
+                ("RamDisk blocks evicted without read", "dfs.datanode.RamDiskBlocksEvictedWithoutRead"),
+                ("RamDisk blocks eviction window avg time", "dfs.datanode.RamDiskBlocksEvictionWindowMsAvgTime"),
+                ("RamDisk blocks eviction window ops", "dfs.datanode.RamDiskBlocksEvictionWindowMsNumOps"),
+                ("RamDisk blocks lazy persisted", "dfs.datanode.RamDiskBlocksLazyPersisted"),
+                ("RamDisk blocks lazy persist window avg time", "dfs.datanode.RamDiskBlocksLazyPersistWindowMsAvgTime"),
+                ("RamDisk blocks lazy persist window ops", "dfs.datanode.RamDiskBlocksLazyPersistWindowMsNumOps"),
+                ("RamDisk blocks read hits", "dfs.datanode.RamDiskBlocksReadHits"),
+                ("RamDisk blocks write", "dfs.datanode.RamDiskBlocksWrite"),
+                ("RamDisk blocks write fallback", "dfs.datanode.RamDiskBlocksWriteFallback"),
+                ("Read block avg time", "dfs.datanode.ReadBlockOpAvgTime"),
+                ("Read block ops", "dfs.datanode.ReadBlockOpNumOps"),
+                ("Replace block avg time", "dfs.datanode.ReplaceBlockOpAvgTime"),
+                ("Replace block ops", "dfs.datanode.ReplaceBlockOpNumOps"),
+                ("Send data packet blocked avg time", "dfs.datanode.SendDataPacketBlockedOnNetworkNanosAvgTime"),
+                ("Send data packet blocked ops", "dfs.datanode.SendDataPacketBlockedOnNetworkNanosNumOps"),
+                ("Write block avg time", "dfs.datanode.WriteBlockOpAvgTime"),
+                ("Write block ops", "dfs.datanode.WriteBlockOpNumOps"),
+                ("Blocks get local path info", "dfs.datanode.BlocksGetLocalPathInfo"),
+            ]
+
+            block_values = []
+            for label, metric_name in block_metric_map:
+                metric_value = await fetch_latest_metric_value(
+                    metric_name,
+                    app_id="datanode",
+                    hostnames=ams_host_filter,
+                    duration_ms=lookback_ms,
+                )
+                if metric_value is not None:
+                    try:
+                        block_values.append((label, int(metric_value)))
+                    except (TypeError, ValueError):
+                        block_values.append((label, float(metric_value)))
+
+            for label, value in block_values:
+                value_str = f"{value:.2f}" if isinstance(value, float) and not float(value).is_integer() else f"{int(value)}"
+                lines.append(f"{label}: {value_str}")
+    else:
+        lines.append("No DataNodes found via Ambari API.")
+
+    return "\n".join(lines)
 
 
 @mcp.tool(title="Query Ambari Metrics")
