@@ -2196,8 +2196,12 @@ async def list_ambari_metrics_metadata(
     include_dimensions: bool = False,
 ) -> str:
     """Retrieve metric metadata from Ambari Metrics service with optional filters."""
+    canonical_app = metrics_catalog.canonicalize_app_id(app_id)
+
     params: Dict[str, str] = {}
-    if app_id:
+    if canonical_app:
+        params["appId"] = canonical_app
+    elif app_id:
         params["appId"] = app_id
     if host_filter:
         params["hostname"] = host_filter
@@ -2261,6 +2265,48 @@ async def list_ambari_metrics_metadata(
         filters_applied.append(f"host~{host_filter}")
 
     if not items:
+        if canonical_app and canonical_app in metrics_catalog.CURATED_METRICS:
+            curated_metrics = metrics_catalog.get_metrics_for_app(canonical_app)
+            limited_metrics = curated_metrics[:max(1, limit)] if limit > 0 else curated_metrics
+
+            lines = [
+                "Ambari Metrics Catalog (curated fallback)",
+                f"appId={canonical_app}",
+                "",
+                "Exact metric names available for this appId:",
+            ]
+
+            if limited_metrics:
+                for metric in limited_metrics:
+                    lines.append(f"  - {metric}")
+                if limit > 0 and len(curated_metrics) > len(limited_metrics):
+                    lines.append(
+                        f"    … {len(curated_metrics) - len(limited_metrics)} additional metrics (increase limit)"
+                    )
+            else:
+                lines.append("  <no curated metrics recorded>")
+
+            component_name = HOST_FILTER_REQUIRED_COMPONENTS.get(canonical_app)
+            if component_name:
+                component_hosts = await get_component_hostnames(component_name)
+                lines.append("")
+                if component_hosts:
+                    preview_count = min(len(component_hosts), 10)
+                    preview_hosts = ", ".join(component_hosts[:preview_count])
+                    if len(component_hosts) > preview_count:
+                        preview_hosts += f", ... (+{len(component_hosts) - preview_count} more)"
+                    lines.append(f"{component_name} hosts ({len(component_hosts)}): {preview_hosts}")
+                else:
+                    lines.append(f"{component_name} hosts: none discovered via Ambari API.")
+
+            lines.append("")
+            lines.append(
+                'Next: call query_ambari_metrics(metric_names="<exact_name>", app_id="%s", ...)' % canonical_app
+            )
+            lines.append("Hostname is optional; omit it for cluster-wide data or supply explicit hosts to narrow the scope.")
+
+            return "\n".join(lines)
+
         return "No metric metadata matched the provided filters."
 
     limited_items = items[:max(1, limit)] if limit > 0 else items
@@ -2722,7 +2768,6 @@ async def query_ambari_metrics(
     }
 
     available_metrics = metrics_catalog.get_metrics_for_app(canonical_app_id)
-    available_metric_set = set(available_metrics)
 
     hostnames_display: Optional[str] = None
     if hostnames:
@@ -2733,7 +2778,6 @@ async def query_ambari_metrics(
 
     component_name = HOST_FILTER_REQUIRED_COMPONENTS.get(canonical_app_id)
     component_hosts: Optional[List[str]] = None
-    host_selection_note_lines: List[str] = []
 
     async def ensure_component_hosts() -> List[str]:
         nonlocal component_hosts
@@ -2790,19 +2834,6 @@ async def query_ambari_metrics(
         lines.append(f'Tip: rerun with metric_names="metric1,metric2"{host_tip}')
         return "\n".join(lines)
 
-    invalid_metrics = [metric for metric in requested_metric_list if metric not in available_metric_set]
-    if invalid_metrics:
-        lines = build_base_output_lines(metric_names or "<pending>", canonical_app_id)
-        lines.append("")
-        lines.append("Unrecognized metric names (exact match required):")
-        for name in invalid_metrics:
-            lines.append(f"  - {name}")
-        lines.append("")
-        lines.append(f"Supported metrics for appId={canonical_app_id}:")
-        for metric in available_metrics:
-            lines.append(f"  - {metric}")
-        return "\n".join(lines)
-
     deduped_metrics: List[str] = []
     seen_metrics: Set[str] = set()
     for metric in requested_metric_list:
@@ -2814,29 +2845,6 @@ async def query_ambari_metrics(
     metric_names_joined = ",".join(deduped_metrics)
     base_params["metricNames"] = metric_names_joined
     resolved_metric_display = metric_names_joined or "<pending>"
-
-    if not hostnames_display and component_name:
-        component_hosts = await ensure_component_hosts()
-        if component_hosts:
-            sanitized_hosts = ",".join(component_hosts)
-            base_params["hostname"] = sanitized_hosts
-            hostnames_display = sanitized_hosts
-            if not group_by_host:
-                group_by_host = True
-            preview_count = min(len(component_hosts), 10)
-            preview_hosts = ", ".join(component_hosts[:preview_count])
-            if len(component_hosts) > preview_count:
-                preview_hosts += f", ... (+{len(component_hosts) - preview_count} more)"
-            host_selection_note_lines.append("Host filter auto-applied for DataNode/NodeManager metrics.")
-            host_selection_note_lines.append(
-                f"{component_name} hosts ({len(component_hosts)}): {preview_hosts}"
-            )
-        else:
-            lines = build_base_output_lines(resolved_metric_display, canonical_app_id)
-            lines.append("")
-            lines.append(f"No hosts were discovered for component {component_name}.")
-            lines.append("Provide hostnames explicitly and retry.")
-            return "\n".join(lines)
 
     if precision:
         base_params["precision"] = precision
@@ -2916,9 +2924,6 @@ async def query_ambari_metrics(
         last_error = error_text
 
     lines: List[str] = build_base_output_lines(resolved_metric_display, canonical_app_id)
-    if host_selection_note_lines:
-        lines.append("")
-        lines.extend(host_selection_note_lines)
     lines.append("")
 
     def format_value(val: Optional[float]) -> str:
@@ -2997,6 +3002,8 @@ async def query_ambari_metrics(
         if last_error:
             lines.append(f"Metrics API reported: {last_error}")
         lines.append("No datapoints were returned for the requested window.")
+        metadata_url = f"{AMBARI_METRICS_BASE_URL}/metrics/metadata"
+        lines.append(f"Tip: verify metric availability via {metadata_url}")
         if attempt_records and (len(attempt_records) > 1 or attempt_records[0].get("error")):
             lines.append("")
             lines.append("Query attempts (appId → results):")

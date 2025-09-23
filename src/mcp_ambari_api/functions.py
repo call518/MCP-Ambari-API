@@ -677,22 +677,6 @@ def build_metric_suggestions(
     return suggestions[:limit]
 
 
-def find_curated_metric(query_tokens: Iterable[str], app_hint: Optional[str] = None) -> Optional[Dict[str, str]]:
-    """Return a curated catalog match for the provided tokens (if any)."""
-
-    match = metrics_catalog.best_catalog_match(list(query_tokens), app_hint=app_hint)
-    if not match:
-        return None
-
-    app_id, entry, score = match
-    return {
-        "metric": entry.metric,
-        "appId": app_id,
-        "label": entry.label,
-        "score": str(score),
-    }
-
-
 def infer_precision_for_window(duration_ms: Optional[int]) -> Optional[str]:
     """Infer AMS precision parameter from duration (milliseconds)."""
 

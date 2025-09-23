@@ -144,7 +144,7 @@ Below is an example screenshot showing how to query the Ambari cluster using MCP
 - `datanode`: dfs.datanode.BlocksRead/Written/Replicated/Removed, dfs.datanode.BlocksCached/Uncached, dfs.datanode.BlocksInPendingIBR/BlocksReceivingInPendingIBR/BlocksReceivedInPendingIBR/BlocksDeletedInPendingIBR, dfs.datanode.BlocksVerified/BlockVerificationFailures, dfs.datanode.BlockChecksumOp*, dfs.datanode.BlockReports*, dfs.datanode.CopyBlockOp*, dfs.datanode.DataNodeBlockRecoveryWorkerCount, dfs.datanode.IncrementalBlockReports*, dfs.datanode.RamDiskBlocks* (deleted/evicted/lazyPersist/readHits/write), dfs.datanode.ReadBlockOp*, dfs.datanode.ReplaceBlockOp*, dfs.datanode.SendDataPacketBlockedOnNetworkNanos*, dfs.datanode.WriteBlockOp*, FSDatasetState...FsDatasetImpl.{Capacity,DfsUsed,Remaining}, dfs.datanode.DataNodeActiveXceiversCount, cpu_user, cpu_system, bytes_in, bytes_out, disk_total
 - `nodemanager`: yarn.NodeManagerMetrics.AllocatedVCores, yarn.NodeManagerMetrics.AvailableVCores, yarn.NodeManagerMetrics.AllocatedGB, yarn.NodeManagerMetrics.AvailableGB, yarn.NodeManagerMetrics.AllocatedContainers, yarn.NodeManagerMetrics.ContainersCompleted, yarn.NodeManagerMetrics.ContainersFailed, yarn.NodeManagerMetrics.ContainersKilled, yarn.NodeManagerMetrics.ContainerLaunchDurationAvgTime, bytes_out, cpu_user, mem_total
 - `resourcemanager`: yarn.QueueMetrics.Queue=root.AllocatedMB, yarn.QueueMetrics.Queue=root.AllocatedVCores, yarn.QueueMetrics.Queue=root.PendingMB, yarn.QueueMetrics.Queue=root.PendingVCores, yarn.QueueMetrics.Queue=root.AppsRunning, yarn.QueueMetrics.Queue=root.default.AllocatedMB, yarn.QueueMetrics.Queue=root.default.PendingMB, yarn.QueueMetrics.Queue=root.default.AppsPending, yarn.QueueMetrics.Queue=root.default.AllocatedContainers, yarn.QueueMetrics.Queue=root.default.AggregateContainersAllocated, yarn.ClusterMetrics.AMLaunchDelayAvgTime, yarn.PartitionQueueMetrics.Queue=root.AppsSubmitted, rpc.rpc.NumOpenConnections, jvm.JvmMetrics.MemHeapUsedM
-- Need another metric? Add a `CatalogEntry` in `src/mcp_ambari_api/metrics_catalog.py`; it will appear in the per-app catalog. Natural-language ranking has been removed—queries now require exact metric names.
+- Need another metric? Add the exact name under the appropriate appId in `BASE_METRICS_BY_APP` inside `src/mcp_ambari_api/metrics_catalog.py`; it will appear in the per-app catalog. Natural-language ranking has been removed—queries now require exact metric names.
 
 ---
 
@@ -154,10 +154,8 @@ Recent updates removed natural-language metric guessing in favor of deterministi
 
 1. **Always pass an explicit `app_id`.** If it is missing or unsupported, the tool returns a list of valid appIds and aborts so you can choose one manually.
 2. **Specify exact metric names.** Use `list_common_metrics_catalog(app_id="<target>", search="keyword")` to browse the curated per-app metric set and copy the identifier (e.g., `jvm.JvmMetrics.MemHeapUsedM`).
-3. **Host-scope behavior**:
-   - DataNode / NodeManager metrics operate per host. When `hostnames` is omitted, the tool automatically resolves the full host list and flips `group_by_host=true`.  
-   - If Ambari reports no hosts for that component, you must supply the host list manually and retry.
-4. **No fuzzy matches.** Typos or unknown metrics trigger a helpful error that lists the supported metrics for the selected appId—fix the spelling and resubmit.
+3. **Host-scope behavior**: When `hostnames` is omitted the API returns cluster-wide aggregates. Provide one or more hosts (comma-separated) to focus on specific nodes.
+4. **No fuzzy matches.** The server now calls Ambari exactly as requested. If the metric is wrong or empty, Ambari will simply return no datapoints—double-check the identifier via `/ws/v1/timeline/metrics/metadata`.
 
 Example invocation:
 
