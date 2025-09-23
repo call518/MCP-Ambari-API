@@ -2736,7 +2736,11 @@ async def query_ambari_metrics(
         seen_metrics = set()
         metrics_changed = False
         for metric in requested_metric_list:
-            resolved = metrics_catalog.resolve_datanode_block_metric_name(metric) or metric
+            resolved = (
+                metrics_catalog.resolve_datanode_block_metric_name(metric)
+                or metrics_catalog.resolve_common_jvm_metric_name(metric)
+                or metric
+            )
             if resolved != metric:
                 metrics_changed = True
             if resolved not in seen_metrics:
@@ -2763,13 +2767,23 @@ async def query_ambari_metrics(
             curated_match_info = curated
 
     block_metrics_mode = False
+    contains_datanode_block_metric = False
+    contains_common_jvm_metric = False
 
     if requested_metric_list:
-        if any(metrics_catalog.is_datanode_block_metric(name) for name in requested_metric_list):
+        contains_datanode_block_metric = any(
+            metrics_catalog.is_datanode_block_metric(name) for name in requested_metric_list
+        )
+        contains_common_jvm_metric = any(
+            metrics_catalog.is_common_jvm_metric(name) for name in requested_metric_list
+        )
+        if contains_datanode_block_metric:
             block_metrics_mode = not explicit_metric_request
         elif curated_match_info and metrics_catalog.is_datanode_block_metric(curated_match_info.get("metric")):
             block_metrics_mode = not explicit_metric_request
-    
+    elif curated_match_info and metrics_catalog.is_common_jvm_metric(curated_match_info.get("metric")):
+        contains_common_jvm_metric = True
+
     if block_metrics_mode:
         requested_metric_list = list(metrics_catalog.DATANODE_BLOCK_METRICS)
         metric_names_joined = ",".join(metrics_catalog.DATANODE_BLOCK_METRICS)
@@ -2781,11 +2795,44 @@ async def query_ambari_metrics(
         if not group_by_host:
             group_by_host = True
 
+    if requested_metric_list:
+        contains_datanode_block_metric = any(
+            metrics_catalog.is_datanode_block_metric(name) for name in requested_metric_list
+        )
+        contains_common_jvm_metric = any(
+            metrics_catalog.is_common_jvm_metric(name) for name in requested_metric_list
+        )
+    else:
+        contains_datanode_block_metric = False
+        contains_common_jvm_metric = False
+
+    hosts_provided = False
     if hostnames:
         sanitized_hosts = ",".join(host.strip() for host in hostnames.split(',') if host.strip())
         if sanitized_hosts:
             base_params["hostname"] = sanitized_hosts
             hostnames = sanitized_hosts
+            hosts_provided = True
+        else:
+            hostnames = None
+    else:
+        hostnames = None
+
+    resolved_app_candidate = (
+        base_params.get("appId")
+        or canonical_app_id
+        or (curated_match_info.get("appId") if curated_match_info else None)
+    )
+    canonical_target_app = metrics_catalog.canonicalize_app_id(resolved_app_candidate)
+
+    metrics_groups = []
+    if canonical_target_app == "datanode" and contains_datanode_block_metric:
+        metrics_groups.append(("DataNode block metrics", metrics_catalog.DATANODE_BLOCK_METRICS))
+    if canonical_target_app in {"datanode", "nodemanager"} and contains_common_jvm_metric:
+        jvm_label = "DataNode JVM metrics" if canonical_target_app == "datanode" else "NodeManager JVM metrics"
+        metrics_groups.append((jvm_label, metrics_catalog.COMMON_JVM_METRICS))
+
+    require_explicit_inputs = bool(metrics_groups) and (not hosts_provided or not explicit_metric_request)
 
     def build_base_output_lines(
         metric_display: str,
@@ -2828,6 +2875,53 @@ async def query_ambari_metrics(
         note_host_app(curated_match_info.get("appId"))
     for metric_name in requested_metric_list:
         note_host_app(metrics_catalog.catalog_app_for_metric(metric_name))
+    note_host_app(canonical_target_app)
+
+    if require_explicit_inputs:
+        component_host_map: Dict[str, List[str]] = {}
+        host_app_targets = sorted(required_host_apps) if required_host_apps else []
+        if not host_app_targets and canonical_target_app:
+            host_app_targets = [canonical_target_app]
+
+        for app_name in host_app_targets:
+            component_name = HOST_FILTER_REQUIRED_COMPONENTS.get(app_name)
+            if not component_name:
+                continue
+            component_hosts = await get_component_hostnames(component_name)
+            component_host_map[component_name] = component_hosts
+
+        lines = build_base_output_lines(resolved_metric_display, canonical_target_app)
+        lines.append("")
+        if not explicit_metric_request:
+            lines.append("Explicit metric_names parameter is required for this metric group.")
+        if not hosts_provided:
+            lines.append("Provide the hostnames parameter (comma-separated) for the target hosts.")
+
+        for label, metrics_tuple in metrics_groups:
+            lines.append("")
+            lines.append(f"{label} ({len(metrics_tuple)}):")
+            for metric_name in metrics_tuple:
+                lines.append(f"  - {metric_name}")
+
+        if component_host_map:
+            lines.append("")
+            for component_name, hosts in component_host_map.items():
+                if hosts:
+                    preview_count = min(len(hosts), 10)
+                    preview_hosts = ", ".join(hosts[:preview_count])
+                    if len(hosts) > preview_count:
+                        preview_hosts += f", ... (+{len(hosts) - preview_count} more)"
+                    lines.append(f"{component_name} hosts ({len(hosts)}): {preview_hosts}")
+                else:
+                    lines.append(f"{component_name} hosts: none discovered via Ambari API.")
+        else:
+            lines.append("")
+            lines.append("No matching component hosts discovered via Ambari API.")
+
+        lines.append("")
+        lines.append('Tip: rerun with metric_names="<metric1,metric2>" hostnames="<host1,host2>"')
+        lines.append('Use list_hosts() if you need the complete host inventory.')
+        return "\n".join(lines)
 
     host_selection_note_lines: List[str] = []
 

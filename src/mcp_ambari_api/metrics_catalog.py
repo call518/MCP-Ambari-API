@@ -862,6 +862,12 @@ CURATED_METRICS: Dict[str, Tuple[CatalogEntry, ...]] = {
             unit="MB",
         ),
         CatalogEntry(
+            metric="jvm.JvmMetrics.MemHeapUsedM",
+            label="NodeManager JVM heap used",
+            keywords=("heap", "memory", "jvm", "usage", "used", "nodemanager"),
+            unit="MB",
+        ),
+        CatalogEntry(
             metric="jvm.JvmMetrics.ThreadsBlocked",
             label="NodeManager JVM threads blocked",
             keywords=("jvm", "threads", "thread", "blocked", "waiting", "nodemanager"),
@@ -1009,6 +1015,61 @@ DATANODE_BLOCK_METRICS: Tuple[str, ...] = (
 
 _DATANODE_BLOCK_EXTRA_KEYWORDS: Tuple[str, ...] = ("datanode", "dfs", "host")
 _DATANODE_RAMDIST_EXTRA_KEYWORDS: Tuple[str, ...] = ("ramdisk", "host")
+
+
+COMMON_JVM_METRICS: Tuple[str, ...] = (
+    "jvm.JvmMetrics.GcTotalExtraSleepTime",
+    "jvm.JvmMetrics.GcCount",
+    "jvm.JvmMetrics.GcCountPS MarkSweep",
+    "jvm.JvmMetrics.MemNonHeapMaxM",
+    "jvm.JvmMetrics.ThreadsWaiting",
+    "jvm.JvmMetrics.GcTimeMillisPS MarkSweep",
+    "jvm.JvmMetrics.MemNonHeapCommittedM",
+    "jvm.JvmMetrics.MemMaxM",
+    "jvm.JvmMetrics.MemHeapCommittedM",
+    "jvm.JvmMetrics.ThreadsNew",
+    "jvm.JvmMetrics.LogInfo",
+    "jvm.JvmMetrics.MemHeapMaxM",
+    "jvm.JvmMetrics.LogError",
+    "jvm.JvmMetrics.ThreadsBlocked",
+    "jvm.JvmMetrics.LogFatal",
+    "jvm.JvmMetrics.GcTimeMillis",
+    "jvm.JvmMetrics.LogWarn",
+    "jvm.JvmMetrics.GcCountPS Scavenge",
+    "jvm.JvmMetrics.ThreadsTerminated",
+    "jvm.JvmMetrics.GcNumWarnThresholdExceeded",
+    "jvm.JvmMetrics.GcTimeMillisPS Scavenge",
+    "jvm.JvmMetrics.GcNumInfoThresholdExceeded",
+    "jvm.JvmMetrics.MemHeapUsedM",
+    "jvm.JvmMetrics.MemNonHeapUsedM",
+    "jvm.JvmMetrics.ThreadsRunnable",
+    "jvm.JvmMetrics.ThreadsTimedWaiting",
+)
+
+
+def _normalize_common_metric_key(metric: str) -> str:
+    return " ".join(metric.strip().lower().split()) if metric else ""
+
+
+_COMMON_JVM_METRIC_LOOKUP = {
+    _normalize_common_metric_key(metric): metric for metric in COMMON_JVM_METRICS
+}
+
+
+def resolve_common_jvm_metric_name(metric_name: Optional[str]) -> Optional[str]:
+    """Return the canonical JVM metric name when it belongs to the common set."""
+
+    if not metric_name:
+        return None
+
+    normalized = _normalize_common_metric_key(metric_name)
+    return _COMMON_JVM_METRIC_LOOKUP.get(normalized)
+
+
+def is_common_jvm_metric(metric_name: Optional[str]) -> bool:
+    """Return True if the metric belongs to the shared JVM metric set."""
+
+    return resolve_common_jvm_metric_name(metric_name) is not None
 
 
 def _dedupe_keywords(keywords: Iterable[str]) -> Tuple[str, ...]:
