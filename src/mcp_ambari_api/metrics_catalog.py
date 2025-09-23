@@ -337,6 +337,12 @@ CURATED_METRICS: Dict[str, Tuple[CatalogEntry, ...]] = {
             unit="MB",
         ),
         CatalogEntry(
+            metric="jvm.JvmMetrics.ThreadsBlocked",
+            label="NameNode JVM threads blocked",
+            keywords=("jvm", "threads", "thread", "blocked", "waiting"),
+            unit="threads",
+        ),
+        CatalogEntry(
             metric="dfs.FSNamesystem.CapacityTotalGB",
             label="HDFS capacity total",
             keywords=("capacity", "total", "hdfs", "storage", "overall"),
@@ -466,7 +472,7 @@ CURATED_METRICS: Dict[str, Tuple[CatalogEntry, ...]] = {
         CatalogEntry(
             metric="dfs.datanode.BlocksRead",
             label="Blocks read",
-            keywords=("block", "read", "io"),
+            keywords=("block", "blocks", "read", "reads", "io"),
             unit="blocks",
         ),
         CatalogEntry(
@@ -486,6 +492,12 @@ CURATED_METRICS: Dict[str, Tuple[CatalogEntry, ...]] = {
             label="Bytes written",
             keywords=("bytes", "write", "network", "throughput"),
             unit="bytes",
+        ),
+        CatalogEntry(
+            metric="jvm.JvmMetrics.ThreadsBlocked",
+            label="DataNode JVM threads blocked",
+            keywords=("jvm", "threads", "thread", "blocked", "waiting", "datanode"),
+            unit="threads",
         ),
         CatalogEntry(
             metric="dfs.datanode.TotalWriteTime",
@@ -849,6 +861,12 @@ CURATED_METRICS: Dict[str, Tuple[CatalogEntry, ...]] = {
             keywords=("memory", "total", "ram", "capacity"),
             unit="MB",
         ),
+        CatalogEntry(
+            metric="jvm.JvmMetrics.ThreadsBlocked",
+            label="NodeManager JVM threads blocked",
+            keywords=("jvm", "threads", "thread", "blocked", "waiting", "nodemanager"),
+            unit="threads",
+        ),
     ),
     "resourcemanager": (
         CatalogEntry(
@@ -935,8 +953,191 @@ CURATED_METRICS: Dict[str, Tuple[CatalogEntry, ...]] = {
             keywords=("heap", "memory", "jvm", "usage", "used"),
             unit="MB",
         ),
+        CatalogEntry(
+            metric="jvm.JvmMetrics.ThreadsBlocked",
+            label="ResourceManager JVM threads blocked",
+            keywords=("jvm", "threads", "thread", "blocked", "waiting", "resourcemanager"),
+            unit="threads",
+        ),
     ),
 }
+
+
+DATANODE_BLOCK_METRICS: Tuple[str, ...] = (
+    "dfs.datanode.BlockChecksumOpAvgTime",
+    "dfs.datanode.BlockChecksumOpNumOps",
+    "dfs.datanode.BlockReportsAvgTime",
+    "dfs.datanode.BlockReportsNumOps",
+    "dfs.datanode.BlocksCached",
+    "dfs.datanode.BlocksDeletedInPendingIBR",
+    "dfs.datanode.BlocksGetLocalPathInfo",
+    "dfs.datanode.BlocksInPendingIBR",
+    "dfs.datanode.BlocksRead",
+    "dfs.datanode.BlocksReceivedInPendingIBR",
+    "dfs.datanode.BlocksReceivingInPendingIBR",
+    "dfs.datanode.BlocksRemoved",
+    "dfs.datanode.BlocksReplicated",
+    "dfs.datanode.BlocksUncached",
+    "dfs.datanode.BlocksVerified",
+    "dfs.datanode.BlocksWritten",
+    "dfs.datanode.BlockVerificationFailures",
+    "dfs.datanode.CopyBlockOpAvgTime",
+    "dfs.datanode.CopyBlockOpNumOps",
+    "dfs.datanode.DataNodeBlockRecoveryWorkerCount",
+    "dfs.datanode.IncrementalBlockReportsAvgTime",
+    "dfs.datanode.IncrementalBlockReportsNumOps",
+    "dfs.datanode.RamDiskBlocksDeletedBeforeLazyPersisted",
+    "dfs.datanode.RamDiskBlocksEvicted",
+    "dfs.datanode.RamDiskBlocksEvictedWithoutRead",
+    "dfs.datanode.RamDiskBlocksEvictionWindowMsAvgTime",
+    "dfs.datanode.RamDiskBlocksEvictionWindowMsNumOps",
+    "dfs.datanode.RamDiskBlocksLazyPersisted",
+    "dfs.datanode.RamDiskBlocksLazyPersistWindowMsAvgTime",
+    "dfs.datanode.RamDiskBlocksLazyPersistWindowMsNumOps",
+    "dfs.datanode.RamDiskBlocksReadHits",
+    "dfs.datanode.RamDiskBlocksWrite",
+    "dfs.datanode.RamDiskBlocksWriteFallback",
+    "dfs.datanode.ReadBlockOpAvgTime",
+    "dfs.datanode.ReadBlockOpNumOps",
+    "dfs.datanode.ReplaceBlockOpAvgTime",
+    "dfs.datanode.ReplaceBlockOpNumOps",
+    "dfs.datanode.SendDataPacketBlockedOnNetworkNanosAvgTime",
+    "dfs.datanode.SendDataPacketBlockedOnNetworkNanosNumOps",
+    "dfs.datanode.WriteBlockOpAvgTime",
+    "dfs.datanode.WriteBlockOpNumOps",
+)
+
+_DATANODE_BLOCK_EXTRA_KEYWORDS: Tuple[str, ...] = ("datanode", "dfs", "host")
+_DATANODE_RAMDIST_EXTRA_KEYWORDS: Tuple[str, ...] = ("ramdisk", "host")
+
+
+def _dedupe_keywords(keywords: Iterable[str]) -> Tuple[str, ...]:
+    seen = set()
+    result: List[str] = []
+
+    for keyword in keywords:
+        lowered = keyword.lower()
+        if lowered in seen:
+            continue
+        seen.add(lowered)
+        result.append(keyword)
+
+    return tuple(result)
+
+
+def _prioritize_datanode_block_metrics() -> None:
+    entries = list(CURATED_METRICS.get("datanode", ()))
+    if not entries:
+        return
+
+    entry_map: Dict[str, CatalogEntry] = {entry.metric: entry for entry in entries}
+    prioritized: List[CatalogEntry] = []
+
+    for metric in DATANODE_BLOCK_METRICS:
+        entry = entry_map.get(metric)
+        if not entry:
+            continue
+
+        if "RamDisk" in metric:
+            extra_keywords = _DATANODE_RAMDIST_EXTRA_KEYWORDS
+        else:
+            extra_keywords = _DATANODE_BLOCK_EXTRA_KEYWORDS
+
+        merged_keywords = _dedupe_keywords(entry.keywords + extra_keywords)
+        if merged_keywords != entry.keywords:
+            entry = CatalogEntry(
+                metric=entry.metric,
+                label=entry.label,
+                keywords=merged_keywords,
+                unit=entry.unit,
+                description=entry.description,
+            )
+
+        prioritized.append(entry)
+
+    remaining = [entry for entry in entries if entry.metric not in DATANODE_BLOCK_METRICS]
+    prioritized.extend(remaining)
+
+    CURATED_METRICS["datanode"] = tuple(prioritized)
+
+
+_prioritize_datanode_block_metrics()
+
+
+_METRIC_TO_APP_INDEX: Dict[str, str] = {}
+
+
+def _rebuild_metric_to_app_index() -> None:
+    _METRIC_TO_APP_INDEX.clear()
+    for app_name, entries in CURATED_METRICS.items():
+        for entry in entries:
+            if entry.metric not in _METRIC_TO_APP_INDEX:
+                _METRIC_TO_APP_INDEX[entry.metric] = app_name
+
+
+_rebuild_metric_to_app_index()
+
+
+def catalog_app_for_metric(metric_name: str) -> Optional[str]:
+    """Return the catalog appId for a metric (if it is curated)."""
+
+    if not metric_name:
+        return None
+    return _METRIC_TO_APP_INDEX.get(metric_name)
+
+
+def is_datanode_block_metric(metric_name: Optional[str]) -> bool:
+    """Return True when the metric is part of the curated DataNode block set."""
+
+    if not metric_name:
+        return False
+    return metric_name in DATANODE_BLOCK_METRICS
+
+
+def resolve_datanode_block_metric_name(metric_name: Optional[str]) -> Optional[str]:
+    """Resolve common aliases to the canonical DataNode block metric name."""
+
+    if not metric_name:
+        return None
+
+    candidate = metric_name.strip()
+    if not candidate:
+        return None
+
+    lowered = candidate.lower()
+    prefix = "dfs.datanode."
+
+    best_match: Optional[str] = None
+    best_score = -1
+
+    for actual in DATANODE_BLOCK_METRICS:
+        actual_lower = actual.lower()
+        if lowered == actual_lower:
+            return actual
+
+        actual_core = actual_lower[len(prefix):] if actual_lower.startswith(prefix) else actual_lower
+        candidate_core = lowered[len(prefix):] if lowered.startswith(prefix) else lowered
+
+        if candidate_core == actual_core:
+            return actual
+
+        score = 0
+        if actual_core.startswith(candidate_core):
+            score = max(score, len(candidate_core))
+        if candidate_core.startswith(actual_core):
+            score = max(score, len(actual_core))
+        if candidate_core in actual_core:
+            score = max(score, len(candidate_core))
+
+        if score > best_score:
+            best_score = score
+            best_match = actual
+
+    # Require a minimum overlap to avoid noisy matches
+    if best_score >= 4:
+        return best_match
+
+    return None
 
 
 APP_SYNONYMS: Dict[str, Tuple[str, ...]] = {
@@ -974,6 +1175,29 @@ def app_from_tokens(tokens: Iterable[str], app_hint: Optional[str] = None) -> Op
             return app
 
     return app_hint if app_hint in CURATED_METRICS else None
+
+
+def canonicalize_app_id(app_id: Optional[str]) -> Optional[str]:
+    """Return the canonical AMS appId (case-insensitive synonym support)."""
+
+    if not app_id:
+        return None
+
+    normalized = app_id.strip()
+    if not normalized:
+        return None
+
+    lowered = normalized.lower()
+
+    for canonical, synonyms in APP_SYNONYMS.items():
+        if lowered == canonical.lower():
+            return canonical
+        for synonym in synonyms:
+            if lowered == synonym.lower():
+                return canonical
+
+    # Default: return lowercase version if unknown (avoids None -> breakage)
+    return lowered
 
 
 def keyword_match_score(entry: CatalogEntry, tokens: Iterable[str]) -> int:

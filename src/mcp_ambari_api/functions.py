@@ -15,10 +15,7 @@ import re
 from base64 import b64encode
 from functools import wraps
 
-from mcp_ambari_api.metrics_catalog import (
-    CURATED_METRICS,
-    best_catalog_match,
-)
+import mcp_ambari_api.metrics_catalog as metrics_catalog
 
 # Set up logging
 logger = logging.getLogger("AmbariService")
@@ -683,7 +680,7 @@ def build_metric_suggestions(
 def find_curated_metric(query_tokens: Iterable[str], app_hint: Optional[str] = None) -> Optional[Dict[str, str]]:
     """Return a curated catalog match for the provided tokens (if any)."""
 
-    match = best_catalog_match(list(query_tokens), app_hint=app_hint)
+    match = metrics_catalog.best_catalog_match(list(query_tokens), app_hint=app_hint)
     if not match:
         return None
 
@@ -720,14 +717,16 @@ async def fetch_metric_series(
     now_ms = int(datetime.datetime.now(datetime.timezone.utc).timestamp() * 1000)
     start_ms = max(0, now_ms - duration_ms)
 
+    canonical_app = metrics_catalog.canonicalize_app_id(app_id)
+
     params: Dict[str, Any] = {
         "metricNames": metric_name,
         "startTime": start_ms,
         "endTime": now_ms,
     }
 
-    if app_id:
-        params["appId"] = app_id
+    if canonical_app:
+        params["appId"] = canonical_app
     if hostnames:
         params["hostname"] = hostnames
 
@@ -763,6 +762,58 @@ async def fetch_latest_metric_value(
     if not series:
         return None
     return series[-1]["value"]
+
+
+async def get_component_hostnames(
+    component_name: str,
+    cluster_name: Optional[str] = None,
+) -> List[str]:
+    """Return sorted hostnames that run the specified Ambari component."""
+
+    if not component_name:
+        return []
+
+    target_cluster = cluster_name or AMBARI_CLUSTER_NAME
+    endpoint = (
+        f"/clusters/{target_cluster}/hosts"
+        "?fields=Hosts/host_name,Hosts/public_host_name,Hosts/ip,"
+        "host_components/HostRoles/component_name"
+    )
+
+    try:
+        response = await make_ambari_request(endpoint)
+    except Exception:
+        logger.exception("Failed to retrieve hosts for component %s", component_name)
+        return []
+
+    if not response or response.get("error"):
+        return []
+
+    hostnames: List[str] = []
+    for item in response.get("items", []):
+        if not isinstance(item, dict):
+            continue
+
+        host_components = item.get("host_components", []) or []
+        component_matches = False
+        for host_component in host_components:
+            roles = host_component.get("HostRoles") if isinstance(host_component, dict) else None
+            role_name = roles.get("component_name") if isinstance(roles, dict) else None
+            if role_name and role_name.upper() == component_name.upper():
+                component_matches = True
+                break
+
+        if not component_matches:
+            continue
+
+        host_info = item.get("Hosts", {}) if isinstance(item, dict) else {}
+        host_name = host_info.get("host_name") or host_info.get("public_host_name") or host_info.get("ip")
+        if host_name and host_name not in hostnames:
+            hostnames.append(host_name)
+
+    hostnames.sort()
+    return hostnames
+
 
 async def format_single_host_details(host_name: str, cluster_name: str, show_header: bool = True) -> str:
     """

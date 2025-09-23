@@ -3,7 +3,7 @@ MCP tool definitions for Ambari REST API operations.
 
 - Ambari API Documents: https://github.com/apache/ambari/blob/trunk/ambari-server/docs/api/v1/index.md
 """
-from typing import Dict, Optional, List, Any
+from typing import Dict, Optional, List, Any, Set
 import argparse
 from fastmcp import FastMCP
 from fastmcp.server.auth import StaticTokenVerifier
@@ -33,8 +33,9 @@ from mcp_ambari_api.functions import (
     get_metrics_metadata,
     infer_precision_for_window,
     fetch_latest_metric_value,
+    get_component_hostnames,
 )
-from mcp_ambari_api.metrics_catalog import iter_catalog_entries, CURATED_METRICS, rank_catalog_matches
+import mcp_ambari_api.metrics_catalog as metrics_catalog
 # from .functions import (
 #     format_timestamp, 
 #     format_single_host_details, 
@@ -85,6 +86,11 @@ else:
 # =============================================================================
 # Constants
 # =============================================================================
+
+HOST_FILTER_REQUIRED_COMPONENTS = {
+    "datanode": "DATANODE",
+    "nodemanager": "NODEMANAGER",
+}
 
 # =============================================================================
 # Helper Functions
@@ -2322,10 +2328,23 @@ async def list_common_metrics_catalog(
     limit = max(1, limit)
     min_score = max(0, min_score)
 
+    canonical_app = metrics_catalog.canonicalize_app_id(app_id)
+
     if app_id and app_id.lower() in {"all", "*"}:
         target_app_ids = CURATED_METRIC_APP_IDS
+    elif canonical_app:
+        target_app_ids = [canonical_app]
     elif app_id:
-        target_app_ids = [item.strip() for item in app_id.split(',') if item.strip()]
+        normalized_targets: List[str] = []
+        for item in app_id.split(','):
+            trimmed = item.strip()
+            if not trimmed:
+                continue
+            canon = metrics_catalog.canonicalize_app_id(trimmed)
+            candidate = canon or trimmed.lower()
+            if candidate not in normalized_targets:
+                normalized_targets.append(candidate)
+        target_app_ids = normalized_targets or CURATED_METRIC_APP_IDS
     else:
         target_app_ids = CURATED_METRIC_APP_IDS
 
@@ -2338,7 +2357,7 @@ async def list_common_metrics_catalog(
     ]
 
     if search_tokens:
-        ranked = rank_catalog_matches(
+        ranked = metrics_catalog.rank_catalog_matches(
             search_tokens,
             app_ids=target_app_ids,
             min_score=min_score,
@@ -2369,7 +2388,7 @@ async def list_common_metrics_catalog(
     header_lines.append("Per-app curated highlights:")
 
     for app_name in target_app_ids:
-        entries = CURATED_METRICS.get(app_name, ())
+        entries = metrics_catalog.CURATED_METRICS.get(app_name, ())
         if not entries:
             continue
         header_lines.append("")
@@ -2673,7 +2692,10 @@ async def query_ambari_metrics(
     if start_ms is None or end_ms is None:
         return "Error: Unable to resolve a valid time window for the request."
 
-    requested_metric_list = [name.strip() for name in str(metric_names).split(',') if name.strip()]
+    raw_metric_arg = str(metric_names or "").strip()
+    requested_metric_list = [name.strip() for name in raw_metric_arg.split(',') if name.strip()]
+    original_requested_metrics = list(requested_metric_list)
+    explicit_metric_request = bool(original_requested_metrics) and all('.' in name for name in original_requested_metrics)
     query_tokens = tokenize_metric_queries(requested_metric_list)
     if not query_tokens and metric_names:
         query_tokens = tokenize_metric_queries([metric_names])
@@ -2687,7 +2709,8 @@ async def query_ambari_metrics(
     resolved_metric_display = metric_names or "<auto>"
     curated_match_info: Optional[Dict[str, str]] = None
 
-    normalized_app_hint = app_id.lower() if app_id else None
+    canonical_app_id = metrics_catalog.canonicalize_app_id(app_id)
+    normalized_app_hint = canonical_app_id or (app_id.lower() if app_id else None)
 
     if not precision and start_ms is not None and end_ms is not None:
         duration_ms = max(0, end_ms - start_ms)
@@ -2697,6 +2720,9 @@ async def query_ambari_metrics(
             precision = inferred_precision
 
     need_catalog_lookup = False
+
+    if canonical_app_id:
+        base_params.setdefault("appId", canonical_app_id)
 
     if not requested_metric_list:
         need_catalog_lookup = True
@@ -2713,6 +2739,25 @@ async def query_ambari_metrics(
     else:
         need_catalog_lookup = True
 
+    if requested_metric_list:
+        resolved_metrics: List[str] = []
+        seen_metrics = set()
+        metrics_changed = False
+        for metric in requested_metric_list:
+            resolved = metrics_catalog.resolve_datanode_block_metric_name(metric) or metric
+            if resolved != metric:
+                metrics_changed = True
+            if resolved not in seen_metrics:
+                seen_metrics.add(resolved)
+                resolved_metrics.append(resolved)
+
+        if metrics_changed:
+            requested_metric_list = resolved_metrics
+            metric_names = ",".join(requested_metric_list)
+            base_params["metricNames"] = metric_names
+            resolved_metric_display = metric_names
+            query_tokens = tokenize_metric_queries(requested_metric_list)
+
     if need_catalog_lookup and query_tokens:
         curated = find_curated_metric(query_tokens, app_hint=normalized_app_hint)
         if curated:
@@ -2725,10 +2770,120 @@ async def query_ambari_metrics(
                 base_params["appId"] = curated_app
             curated_match_info = curated
 
+    block_metrics_mode = False
+
+    if requested_metric_list:
+        if any(metrics_catalog.is_datanode_block_metric(name) for name in requested_metric_list):
+            block_metrics_mode = not explicit_metric_request
+        elif curated_match_info and metrics_catalog.is_datanode_block_metric(curated_match_info.get("metric")):
+            block_metrics_mode = not explicit_metric_request
+    
+    if block_metrics_mode:
+        requested_metric_list = list(metrics_catalog.DATANODE_BLOCK_METRICS)
+        metric_names_joined = ",".join(metrics_catalog.DATANODE_BLOCK_METRICS)
+        base_params["metricNames"] = metric_names_joined
+        resolved_metric_display = metric_names_joined
+        canonical_app_id = "datanode"
+        base_params["appId"] = canonical_app_id
+        normalized_app_hint = canonical_app_id
+        if not group_by_host:
+            group_by_host = True
+
     if hostnames:
         sanitized_hosts = ",".join(host.strip() for host in hostnames.split(',') if host.strip())
         if sanitized_hosts:
             base_params["hostname"] = sanitized_hosts
+            hostnames = sanitized_hosts
+
+    def build_base_output_lines(
+        metric_display: str,
+        resolved_label_override: Optional[str] = None,
+    ) -> List[str]:
+        base_lines = [
+            "Ambari Metrics Query",
+            f"Endpoint: {AMBARI_METRICS_BASE_URL}/metrics",
+            f"Window: {window_desc}",
+            f"Metric names: {metric_display}",
+        ]
+        base_lines.append(f"Requested appId: {app_id or 'not provided'}")
+        resolved_label = (
+            resolved_label_override
+            if resolved_label_override is not None
+            else base_params.get("appId")
+            or canonical_app_id
+            or ("<omitted>" if app_id else "auto")
+        )
+        base_lines.append(f"Resolved appId: {resolved_label}")
+        base_lines.append(f"Hosts: {hostnames or 'cluster / default scope'}")
+        if precision:
+            base_lines.append(f"Precision: {precision}")
+        if temporal_aggregator:
+            base_lines.append(f"Temporal aggregator: {temporal_aggregator}")
+        if temporal_granularity:
+            base_lines.append(f"Temporal granularity: {temporal_granularity}")
+        return base_lines
+
+    required_host_apps: Set[str] = set()
+
+    def note_host_app(candidate_app: Optional[str]) -> None:
+        canonical = metrics_catalog.canonicalize_app_id(candidate_app)
+        if canonical and canonical in HOST_FILTER_REQUIRED_COMPONENTS:
+            required_host_apps.add(canonical)
+
+    note_host_app(base_params.get("appId"))
+    note_host_app(canonical_app_id)
+    if curated_match_info:
+        note_host_app(curated_match_info.get("appId"))
+    for metric_name in requested_metric_list:
+        note_host_app(metrics_catalog.catalog_app_for_metric(metric_name))
+
+    host_selection_note_lines: List[str] = []
+
+    if "hostname" not in base_params and required_host_apps:
+        component_host_map: Dict[str, List[str]] = {}
+        aggregated_hosts: List[str] = []
+
+        for app_name in sorted(required_host_apps):
+            component_name = HOST_FILTER_REQUIRED_COMPONENTS[app_name]
+            component_hosts = await get_component_hostnames(component_name)
+            component_host_map[component_name] = component_hosts
+            if component_hosts:
+                aggregated_hosts.extend(component_hosts)
+
+        unique_hosts = sorted(dict.fromkeys(aggregated_hosts))
+
+        if group_by_host and unique_hosts:
+            sanitized_hosts = ",".join(unique_hosts)
+            base_params["hostname"] = sanitized_hosts
+            hostnames = sanitized_hosts
+
+            host_selection_note_lines.append("Host filter auto-applied for DataNode/NodeManager metrics.")
+            for component_name, hosts in component_host_map.items():
+                if not hosts:
+                    host_selection_note_lines.append(f"{component_name} hosts: none discovered via Ambari API.")
+                    continue
+                preview_count = min(len(hosts), 10)
+                preview_hosts = ", ".join(hosts[:preview_count])
+                if len(hosts) > preview_count:
+                    preview_hosts += f", ... (+{len(hosts) - preview_count} more)"
+                host_selection_note_lines.append(f"{component_name} hosts ({len(hosts)}): {preview_hosts}")
+        else:
+            lines = build_base_output_lines(resolved_metric_display)
+            lines.append("")
+            lines.append("Host filter required for DataNode/NodeManager metrics.")
+            for component_name, hosts in component_host_map.items():
+                if hosts:
+                    preview_count = min(len(hosts), 10)
+                    preview_hosts = ", ".join(hosts[:preview_count])
+                    if len(hosts) > preview_count:
+                        preview_hosts += f", ... (+{len(hosts) - preview_count} more)"
+                    lines.append(f"{component_name} hosts ({len(hosts)}): {preview_hosts}")
+                else:
+                    lines.append(f"{component_name} hosts: none discovered via Ambari API.")
+            lines.append("")
+            lines.append('Tip: rerun with hostnames="<host>" (comma-separated for multiple hosts).')
+            lines.append('Use list_hosts() if you need the complete host inventory.')
+            return "\n".join(lines)
 
     if precision:
         base_params["precision"] = precision
@@ -2797,9 +2952,11 @@ async def query_ambari_metrics(
 
     # Build candidate appId variants (case normalization + omission fallback)
     app_variants: List[Optional[str]] = [None]
-    if resolved_app_id and resolved_app_id not in (app_id or "",):
+    if resolved_app_id and resolved_app_id not in (canonical_app_id or "",):
         app_variants.insert(0, resolved_app_id)
-    if app_id:
+    if canonical_app_id and canonical_app_id not in app_variants:
+        app_variants.insert(0, canonical_app_id)
+    elif app_id:
         seen_variants: List[str] = []
         candidates = [
             app_id,
@@ -2837,29 +2994,6 @@ async def query_ambari_metrics(
                 resolved_metric_display = query_params.get("metricNames", metric_names)
             break
 
-    def build_base_output_lines(metric_display: str) -> List[str]:
-        base_lines = [
-            "Ambari Metrics Query",
-            f"Endpoint: {AMBARI_METRICS_BASE_URL}/metrics",
-            f"Window: {window_desc}",
-            f"Metric names: {metric_display}",
-        ]
-        base_lines.append(f"Requested appId: {app_id or 'not provided'}")
-        resolved_label = (
-            resolved_app_id
-            if resolved_app_id is not None
-            else ("<omitted>" if app_id else "auto")
-        )
-        base_lines.append(f"Resolved appId: {resolved_label}")
-        base_lines.append(f"Hosts: {hostnames or 'cluster / default scope'}")
-        if precision:
-            base_lines.append(f"Precision: {precision}")
-        if temporal_aggregator:
-            base_lines.append(f"Temporal aggregator: {temporal_aggregator}")
-        if temporal_granularity:
-            base_lines.append(f"Temporal granularity: {temporal_granularity}")
-        return base_lines
-
     if not metrics_list:
         # Attempt automatic metadata-assisted retries when initial query has no datapoints
         metadata_entries: List[Dict] = []
@@ -2867,13 +3001,13 @@ async def query_ambari_metrics(
 
         try:
             metadata_entries = await collect_metadata_entries(
-                app_ids=[app_id] if app_id else None,
-                prefer_app=app_id,
+                app_ids=[metrics_catalog.canonicalize_app_id(app_id)] if app_id else None,
+                prefer_app=canonical_app_id or metrics_catalog.canonicalize_app_id(app_id),
             )
             suggestions = build_metric_suggestions(
                 query_tokens or tokenize_metric_queries([metric_names]),
                 metadata_entries,
-                prefer_app=app_id,
+                prefer_app=canonical_app_id or metrics_catalog.canonicalize_app_id(app_id),
                 limit=6,
             )
         except Exception as metadata_exc:
@@ -2907,7 +3041,7 @@ async def query_ambari_metrics(
                     break
 
         if not metrics_list:
-            lines = build_base_output_lines(metric_names)
+            lines = build_base_output_lines(resolved_metric_display, resolved_app_id)
             lines.append("")
             if last_error:
                 lines.append(f"Metrics API reported: {last_error}")
@@ -2954,36 +3088,49 @@ async def query_ambari_metrics(
             return f"{val:.4g}"
         return f"{val:.2f}"
 
-    lines: List[str] = build_base_output_lines(resolved_metric_display)
-    lines.append("")
+    def append_metric_summary(
+        entry: Dict[str, Any],
+        idx_label: Optional[int],
+        indent: str = "",
+        show_host: bool = True,
+        lines_out: Optional[List[str]] = None,
+    ) -> None:
+        target_lines = lines_out if lines_out is not None else lines
 
-    for idx, metric_entry in enumerate(metrics_list, 1):
-        if not isinstance(metric_entry, dict):
-            continue
+        metric_name = entry.get("metricname") or entry.get("metricName") or entry.get("name", "<unknown>")
+        app_label = entry.get("appid") or entry.get("appId") or app_id or "-"
+        host_label = entry.get("hostname") or entry.get("host") or "all"
 
-        metric_name = metric_entry.get("metricname") or metric_entry.get("metricName") or metric_entry.get("name", "<unknown>")
-        app = metric_entry.get("appid") or metric_entry.get("appId") or app_id or "-"
-        host = metric_entry.get("hostname") or metric_entry.get("host") or "all"
-        series = metrics_map_to_series(metric_entry.get("metrics", {}))
+        header_prefix = f"{indent}[{idx_label}] " if idx_label is not None else indent
+        header = f"{header_prefix}{metric_name}"
+        if show_host:
+            header += f" (appId={app_label}, host={host_label})"
+        else:
+            header += f" (appId={app_label})"
+        target_lines.append(header)
+
+        series = metrics_map_to_series(entry.get("metrics", {}))
         summary = summarize_metric_series(series)
 
-        lines.append(f"[{idx}] {metric_name} (appId={app}, host={host})")
+        detail_indent = indent + "  "
 
         if not summary:
-            lines.append("     No datapoints returned for this metric.")
-            lines.append("")
-            continue
+            target_lines.append(f"{detail_indent}No datapoints returned for this metric.")
+            target_lines.append("")
+            return
 
-        lines.append(
-            f"     Points={summary['count']} | min={format_value(summary['min'])} | max={format_value(summary['max'])} | avg={format_value(summary['avg'])}"
+        target_lines.append(
+            f"{detail_indent}Points={summary['count']} | min={format_value(summary['min'])} | max={format_value(summary['max'])} | avg={format_value(summary['avg'])}"
         )
-        lines.append(
-            f"     first={format_value(summary['first'])} @ {format_timestamp(summary['start_timestamp'])}"
+        target_lines.append(
+            f"{detail_indent}first={format_value(summary['first'])} @ {format_timestamp(summary['start_timestamp'])}"
         )
-        lines.append(
-            f"     last={format_value(summary['last'])} @ {format_timestamp(summary['end_timestamp'])}"
+        target_lines.append(
+            f"{detail_indent}last={format_value(summary['last'])} @ {format_timestamp(summary['end_timestamp'])}"
         )
-        lines.append(f"     delta={format_value(summary['delta'])} over {summary['duration_ms'] / 1000:.1f}s")
+        target_lines.append(
+            f"{detail_indent}delta={format_value(summary['delta'])} over {summary['duration_ms'] / 1000:.1f}s"
+        )
 
         if include_points and series:
             if max_points > 0 and len(series) > max_points:
@@ -2994,15 +3141,45 @@ async def query_ambari_metrics(
                 sampled = series
                 skipped = 0
 
-            lines.append("     Sampled datapoints:")
+            target_lines.append(f"{detail_indent}Sampled datapoints:")
             for point in sampled:
-                lines.append(
-                    f"       • {format_timestamp(point['timestamp'])} → {format_value(point['value'])}"
+                target_lines.append(
+                    f"{detail_indent}  • {format_timestamp(point['timestamp'])} → {format_value(point['value'])}"
                 )
             if skipped > 0:
-                lines.append(f"       … {skipped} additional points omitted (increase max_points)")
+                target_lines.append(f"{detail_indent}  … {skipped} additional points omitted (increase max_points)")
 
+        target_lines.append("")
+
+    lines: List[str] = build_base_output_lines(resolved_metric_display, resolved_app_id)
+    if host_selection_note_lines:
         lines.append("")
+        lines.extend(host_selection_note_lines)
+    lines.append("")
+
+    if block_metrics_mode and metrics_list:
+        host_group_map: Dict[str, List[Dict[str, Any]]] = {}
+        for entry in metrics_list:
+            if not isinstance(entry, dict):
+                continue
+            host_key = entry.get("hostname") or entry.get("host") or "all"
+            host_group_map.setdefault(host_key, []).append(entry)
+
+        for host_name in sorted(host_group_map):
+            host_entries = host_group_map[host_name]
+            lines.append(f"Host: {host_name}")
+            lines.append("-" * 60)
+            host_entries.sort(key=lambda item: str(item.get("metricname") or item.get("metricName") or ""))
+            for idx, metric_entry in enumerate(host_entries, 1):
+                append_metric_summary(metric_entry, idx, indent="  ", show_host=False)
+            if not host_entries:
+                lines.append("  No metrics returned for this host.")
+                lines.append("")
+    else:
+        for idx, metric_entry in enumerate(metrics_list, 1):
+            if not isinstance(metric_entry, dict):
+                continue
+            append_metric_summary(metric_entry, idx)
 
     if len(attempt_records) > 1 or (app_id and app_id != (resolved_app_id or "<omitted>")):
         lines.append("Query attempts (appId → results):")
