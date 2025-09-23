@@ -53,6 +53,9 @@ Every tool call triggers a real Ambari REST API request. Call tools ONLY when ne
 | Alert history / past alerts / alert events | get_alerts_history(mode="history") | Historical alert events | Filter by state/service/host/time |
 | Legacy current alerts (deprecated) | get_current_alerts | Active alerts | Use get_alerts_history(mode="current") instead |
 | Legacy alert history (deprecated) | get_alert_history | Historical alerts | Use get_alerts_history(mode="history") instead |
+| Curated metrics catalog / quick search | list_common_metrics_catalog | Highlighted metrics per app + keyword search | Defaults to ambari_server/namenode/datanode/nodemanager/resourcemanager |
+| Ambari metrics catalog / metric discovery | list_ambari_metrics_metadata | Metric metadata (units, scope) | Narrow with app_id/metric/host filters |
+| Ambari metrics trends / time series | query_ambari_metrics | Summaries + optional datapoints | Provide metricNames + duration/start/end |
 | Get prompt template | get_prompt_template | Template sections | For AI system prompts |
 | Template full content | prompt_template_full | Complete template | Internal use |
 | Template section headings | prompt_template_headings | Section titles | Internal use |
@@ -76,6 +79,7 @@ Every tool call triggers a real Ambari REST API request. Call tools ONLY when ne
 10. Mentions alerts / current alerts / alert status → get_alerts_history(mode="current") for real-time alert monitoring.
 11. Mentions alert history / past alerts / alert events / alert timeline → get_alerts_history(mode="history") with appropriate filters (state, service, host, time range).
 12. Ambiguous reference ("restart it") → if no prior unambiguous service, ask (or clarify) before calling.
+13. Mentions metrics / usage trend / heat / CPU/disk stats / capacity change → query_ambari_metrics (tool auto-selects curated metric names + precision; fall back to list_common_metrics_catalog or list_ambari_metrics_metadata when exploring entirely new signals).
 
 ---
 ## 5. Smart Time Context for Natural Language Processing
@@ -315,6 +319,21 @@ Any suggestion to check elsewhere manually instead of using the API tools.
 - "Show all alerts that occurred in the past month."
 - "Find alerts for specific host from last 7 days."
 - 💡 **Smart Time Processing**: Supports natural language time expressions in any language.
+
+### 📈 Metrics & Trends
+
+**list_common_metrics_catalog**
+- "What NameNode metrics can I query?"
+- "Search the catalog for heap usage metrics."
+- "Show common metrics for the ResourceManager."
+- 💡 **Tip**: use `search="heap"` or similar to narrow the suggestions before running a time-series query.
+
+**query_ambari_metrics**
+- "Show last hour NameNode heap usage trend."
+- "Plot HDFS NameNode safe mode time over the past 6 hours."
+- "Check DataNode bytes written in the last 30 minutes."
+- "Show ResourceManager root queue pending MB for the past day."
+- 💡 **Tip**: metric names are auto-matched from the catalog; override the inferred granularity with `precision` if you need explicit `SECONDS` / `MINUTES` / `HOURS`.
 
 ### 📚 System Information
 

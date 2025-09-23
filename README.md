@@ -27,12 +27,14 @@
 
 - **Automated Service Management**: Start, stop, restart Hadoop services (HDFS, YARN, Spark, etc.) with simple commands
 - **Real-time Monitoring**: Monitor cluster health, service status, and performance metrics
+- **Metrics Analytics**: Query Ambari Metrics (AMS) for live time-series data, trend deltas, and capacity insights
 - **Configuration Management**: View, update, and manage cluster configurations across all services  
 - **Alert Management**: Track and manage cluster alerts and notifications
 - **User & Host Management**: Manage cluster users, permissions, and host assignments
 - **Request Tracking**: Monitor long-running operations with detailed progress tracking
 
 ### Docuement for Airflow REST-API
+
 - [Ambari API Documents](https://github.com/apache/ambari/blob/trunk/ambari-server/docs/api/v1/index.md)
 
 ## Topics
@@ -43,9 +45,11 @@
 
 ## Example Queries - Cluster Info/Status
 
+### [Go to More Example Queries](./src/mcp_ambari_api/prompt_template.md#9-example-queries)
+
 ![Example: Querying Ambari Cluster(1)](img/ex-screenshot-1.png)
 
-**[Go to More Example Queries](./src/mcp_ambari_api/prompt_template.md#5-example-queries)**
+![Example: Querying Ambari Cluster(2)](img/ex-screenshot-ambari-metric-01.png)
 
 ---
 
@@ -83,6 +87,12 @@ Start the `MCP-Server`, `MCPO`(MCP-Proxy for OpenAPI), and `OpenWebUI`.
    AMBARI_USER=admin
    AMBARI_PASS=admin
    AMBARI_CLUSTER_NAME=TEST-AMBARI
+
+   # Ambari Metrics (AMS) collector
+   AMBARI_METRICS_HOST=host.docker.internal
+   AMBARI_METRICS_PORT=16188
+   AMBARI_METRICS_PROTOCOL=http
+   AMBARI_METRICS_TIMEOUT=15
    
    # (Optional) Enable authentication for streamable-http mode
    # Recommended for production environments
@@ -121,143 +131,19 @@ Below is an example screenshot showing how to query the Ambari cluster using MCP
 
 ---
 
-## 💡 Tool Example Queries
+## 📈 Metrics & Trends
 
-### 🔍 Cluster & Service Management
+- `list_common_metrics_catalog`: keyword search against the curated metric catalog (see below) with cached responses. Use `search="heap"` or similar to narrow suggestions before running a time-series query.
+- `query_ambari_metrics`: fetch time-series data; the tool auto-selects curated metric names, falls back to metadata search when needed, and picks a sensible `precision` for the requested window (override with `precision="SECONDS"`, etc., when necessary).
+- `list_ambari_metrics_metadata`: raw AMS metadata explorer for ad-hoc discovery (supports `app_id`, `metric_name_filter`, `host_filter`).
 
-**get_cluster_info**
-- "Show cluster summary and basic information."
-- "What's the cluster name and version?"
-- "Display cluster overview with service counts."
-- 📋 **Features**: Cluster name, version, service counts, basic cluster information
-
-**get_cluster_services**
-- "Show all cluster services and their current status."
-- "List all services with their states."
-- "Display service overview for the cluster."
-- "Which services are running in the cluster?"
-- 📋 **Features**: Service names, states, health status overview
-
-**get_service_status**
-- "What's the status of HDFS service?"
-- "Check if YARN is running properly."
-- "Show current state of HBase service."
-- "Is the MapReduce service healthy?"
-- 📋 **Features**: Individual service state, health check, status details
-
-**get_service_components**
-- "Show HDFS components and which hosts they're running on."
-- "List all YARN components with their host assignments."
-- "Display component distribution for Kafka service."
-- "Which hosts are running NameNode components?"
-- 📋 **Features**: Component-to-host mapping, service distribution analysis
-
-**get_service_details**
-- "Get detailed information about HDFS service including all components."
-- "Show comprehensive YARN service overview with component states."
-- "Display full service details for Spark with host assignments."
-- 📋 **Features**: Complete service overview with components and host details
-
-### ⚙️ Service Operations
-
-**start_service / stop_service / restart_service**
-- "Start the HDFS service."
-- "Stop the MapReduce service."
-- "Restart the YARN service."
-- "Please restart the HBase service."
-- 📋 **Features**: Individual service lifecycle management
-- ⚠️ **Note**: Returns request ID for operation tracking
-
-**start_all_services / stop_all_services / restart_all_services**
-- "Start all cluster services."
-- "Stop all services in the cluster."
-- "Restart all cluster services."
-- 📋 **Features**: Bulk service operations for entire cluster
-- ⚠️ **Warning**: These are high-impact operations affecting the entire cluster
-
-### 📊 Operations & Monitoring
-
-**get_active_requests**
-- "Show all running operations."
-- "List current service requests in progress."
-- "What operations are currently active?"
-- "Display ongoing cluster operations."
-- 📋 **Features**: Real-time operation status, request monitoring
-
-**get_request_status**
-- "Check the status of request ID 123."
-- "Show progress for operation 456."
-- "Get details for the last restart request."
-- "Monitor request 789 completion status."
-- 📋 **Features**: Detailed request progress, completion status, error tracking
-
-### 🖥️ Host Management
-
-**list_hosts**
-- "List all hosts in the cluster."
-- "Show cluster node inventory."
-- "Display all available hosts."
-- 📋 **Features**: Host inventory, cluster node overview
-
-**get_host_details**
-- "Show detailed information for host node1.example.com."
-- "Get component status on host node2.example.com."
-- "Display all host details with component states."
-- "Show hardware and component information for specific host."
-- 📋 **Features**: Hardware specs, component states, host health status
-- 💡 **Tip**: Omit hostname parameter to get details for all hosts
-
-### 🔧 Configuration Management
-
-**dump_configurations**
-- "Show all configuration types available."
-- "Display HDFS configuration settings."
-- "Get YARN resource manager configuration."
-- "Show core-site.xml configuration values."
-- "Find all configurations containing 'memory' settings."
-- "Display summarized view of all service configurations."
-- 📋 **Features**: Configuration type exploration, property search, service-specific configs
-- 💡 **Usage**: Use `summarize=True` for overview, `filter` parameter for specific properties
-
-### 👥 User Management
-
-**list_users**
-- "Show all cluster users."
-- "List users with access to Ambari."
-- "Display user accounts and their roles."
-- 📋 **Features**: User accounts, role assignments, access permissions
-
-**get_user**
-- "Get detailed information for user 'admin'."
-- "Show profile and permissions for user 'operator'."
-- "Display authentication details for specific user."
-- 📋 **Features**: User profile, permissions, authentication source, role details
-
-### 🚨 Alert Management
-
-**get_alerts_history (current mode)**
-- "Show current active alerts."
-- "Display all current alert states."
-- "List active alerts for HDFS service."
-- "Show critical alerts that are currently active."
-- 📋 **Features**: Real-time alert monitoring, service-specific alerts, severity filtering
-
-**get_alerts_history (history mode)**
-- "Show alert history for the last 24 hours."
-- "Display HDFS alerts from yesterday."
-- "Get critical alerts from last week."
-- "Show all alerts that occurred in the past month."
-- "Find alerts for specific host from last 7 days."
-- 📋 **Features**: Historical alert analysis, time-based filtering, trend analysis
-- 💡 **Smart Time Processing**: Supports natural language time expressions in any language
-
-### 📚 System Information
-
-**get_prompt_template**
-- "Show available prompt template sections."
-- "Get tool usage guidelines."
-- "Display example queries for reference."
-- 📋 **Features**: Template documentation, usage guidelines, section navigation
+**Supported Metric Catalog (curated subset)**
+- `ambari_server`: events.alerts, events.alerts.avg, events.requests, events.requests.avg, events.agentactions, events.agentactions.avg, events.services, events.hosts, events.topology_update, live_hosts, alert_definitions
+- `namenode`: jvm.JvmMetrics.MemHeapUsedM, jvm.JvmMetrics.MemHeapCommittedM, dfs.FSNamesystem.CapacityTotalGB, dfs.FSNamesystem.CapacityRemainingGB, dfs.FSNamesystem.CapacityUsedGB, dfs.FSNamesystem.UnderReplicatedBlocks, dfs.FSNamesystem.PendingReplicationBlocks, dfs.namenode.PendingDeleteBlocksCount, dfs.namenode.GetBlockLocations, dfs.namenode.SafeModeTime, jvm.JvmMetrics.GcTimeMillis, rpc.rpc.client.RpcAuthenticationSuccesses
+- `datanode`: dfs.datanode.BlocksRead, dfs.datanode.BlocksWritten, dfs.datanode.BytesRead, dfs.datanode.BytesWritten, dfs.datanode.TotalWriteTime, dfs.datanode.VolumeFailures, FSDatasetState...FsDatasetImpl.Capacity, FSDatasetState...FsDatasetImpl.DfsUsed, cpu_user, cpu_system, bytes_in, bytes_out, disk_total
+- `nodemanager`: yarn.NodeManagerMetrics.AllocatedVCores, yarn.NodeManagerMetrics.AvailableVCores, yarn.NodeManagerMetrics.AllocatedGB, yarn.NodeManagerMetrics.AvailableGB, yarn.NodeManagerMetrics.AllocatedContainers, yarn.NodeManagerMetrics.ContainersCompleted, yarn.NodeManagerMetrics.ContainersFailed, yarn.NodeManagerMetrics.ContainersKilled, yarn.NodeManagerMetrics.ContainerLaunchDurationAvgTime, bytes_out, cpu_user, mem_total
+- `resourcemanager`: yarn.QueueMetrics.Queue=root.AllocatedMB, yarn.QueueMetrics.Queue=root.AllocatedVCores, yarn.QueueMetrics.Queue=root.PendingMB, yarn.QueueMetrics.Queue=root.PendingVCores, yarn.QueueMetrics.Queue=root.AppsRunning, yarn.QueueMetrics.Queue=root.default.AllocatedMB, yarn.QueueMetrics.Queue=root.default.PendingMB, yarn.QueueMetrics.Queue=root.default.AppsPending, yarn.QueueMetrics.Queue=root.default.AllocatedContainers, yarn.QueueMetrics.Queue=root.default.AggregateContainersAllocated, yarn.ClusterMetrics.AMLaunchDelayAvgTime, yarn.PartitionQueueMetrics.Queue=root.AppsSubmitted, rpc.rpc.NumOpenConnections, jvm.JvmMetrics.MemHeapUsedM
+- Need another metric? Add a `CatalogEntry` in `src/mcp_ambari_api/metrics_catalog.py` and it will be picked up automatically by the catalog/search logic.
 
 ---
 

@@ -10,9 +10,15 @@ import datetime
 import logging
 import time
 from datetime import timedelta
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple, List, Any, Iterable
+import re
 from base64 import b64encode
 from functools import wraps
+
+from mcp_ambari_api.metrics_catalog import (
+    CURATED_METRICS,
+    best_catalog_match,
+)
 
 # Set up logging
 logger = logging.getLogger("AmbariService")
@@ -65,6 +71,35 @@ AMBARI_CLUSTER_NAME = os.environ.get("AMBARI_CLUSTER_NAME", "c1")
 
 # AMBARI API base URL configuration
 AMBARI_API_BASE_URL = f"http://{AMBARI_HOST}:{AMBARI_PORT}/api/v1"
+
+# Ambari Metrics (AMS) connection settings
+AMBARI_METRICS_HOST = os.environ.get("AMBARI_METRICS_HOST", AMBARI_HOST)
+AMBARI_METRICS_PORT = os.environ.get("AMBARI_METRICS_PORT", os.environ.get("AMBARI_METRICS_COLLECTOR_PORT", "6188"))
+AMBARI_METRICS_PROTOCOL = os.environ.get("AMBARI_METRICS_PROTOCOL", "http")
+AMBARI_METRICS_BASE_URL = f"{AMBARI_METRICS_PROTOCOL}://{AMBARI_METRICS_HOST}:{AMBARI_METRICS_PORT}/ws/v1/timeline"
+AMBARI_METRICS_TIMEOUT = float(os.environ.get("AMBARI_METRICS_TIMEOUT", "10"))
+PRECISION_RULES_MS = (
+    (6 * 3600 * 1000, "seconds"),        # up to ~6 hours → seconds resolution
+    (7 * 24 * 3600 * 1000, "minutes"),    # up to ~7 days → minutes
+    (31 * 24 * 3600 * 1000, "hours"),     # up to ~1 month → hours
+    (float("inf"), "days"),              # beyond → days
+)
+
+# Cached metadata settings
+AMBARI_METRICS_METADATA_TTL = float(os.environ.get("AMBARI_METRICS_METADATA_TTL", "300"))
+CURATED_METRIC_APP_IDS = [
+    "ambari_server",
+    "namenode",
+    "datanode",
+    "nodemanager",
+    "resourcemanager",
+]
+
+# Private caches for metadata responses (key → {timestamp, entries})
+_METRICS_METADATA_CACHE: Dict[str, Dict[str, Any]] = {}
+
+# Tokenization helper (split on non-alphanumeric)
+_TOKEN_SPLIT_RE = re.compile(r"[^a-z0-9]+")
 
 
 def format_timestamp(timestamp, is_milliseconds=True):
@@ -178,6 +213,500 @@ async def make_ambari_request(endpoint: str, method: str = "GET", data: Optional
         logger.exception(f"AMBARI_REQ exception took={elapsed:.1f}ms endpoint={endpoint}")
         return {"error": f"Request failed: {str(e)}"}
 
+
+def _normalize_epoch_ms(value: float) -> int:
+    """Normalize a timestamp (seconds or milliseconds) to milliseconds."""
+    try:
+        ts = float(value)
+    except (TypeError, ValueError):
+        raise ValueError("Invalid timestamp value")
+
+    if ts >= 1_000_000_000_000:
+        return int(ts)
+    return int(ts * 1000)
+
+
+def parse_epoch_millis(value: Optional[str]) -> Optional[int]:
+    """Parse various timestamp formats into epoch milliseconds."""
+    if value is None:
+        return None
+
+    raw = str(value).strip()
+    if not raw:
+        return None
+
+    if re.fullmatch(r"[-+]?\d+(?:\.\d+)?", raw):
+        try:
+            num = float(raw)
+        except ValueError:
+            return None
+        return _normalize_epoch_ms(num)
+
+    iso_candidate = raw
+    if iso_candidate.endswith('Z'):
+        iso_candidate = iso_candidate[:-1] + '+00:00'
+
+    try:
+        dt = datetime.datetime.fromisoformat(iso_candidate)
+    except ValueError:
+        try:
+            dt = datetime.datetime.strptime(raw, "%Y-%m-%d %H:%M:%S")
+            dt = dt.replace(tzinfo=datetime.timezone.utc)
+        except ValueError:
+            return None
+
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=datetime.timezone.utc)
+
+    return int(dt.timestamp() * 1000)
+
+
+_DURATION_PATTERN = re.compile(r"(\d+(?:\.\d+)?)\s*(milliseconds?|ms|seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h|days?|d)")
+
+
+def parse_duration_to_millis(duration: Optional[str]) -> Optional[int]:
+    """Parse human-friendly duration strings into milliseconds."""
+    if duration is None:
+        return None
+
+    text = duration.strip().lower()
+    if not text:
+        return None
+
+    matches = list(_DURATION_PATTERN.finditer(text))
+    if not matches:
+        try:
+            numeric = float(text)
+        except ValueError:
+            return None
+        return int(numeric * 1000)
+
+    total_seconds = 0.0
+    for match in matches:
+        amount = float(match.group(1))
+        unit = match.group(2)
+        if unit.startswith('ms'):
+            total_seconds += amount / 1000.0
+        elif unit.startswith('s') or unit.startswith('sec'):
+            total_seconds += amount
+        elif unit.startswith('m') and not unit.startswith('ms'):
+            total_seconds += amount * 60
+        elif unit.startswith('h') or unit.startswith('hr'):
+            total_seconds += amount * 3600
+        elif unit.startswith('d'):
+            total_seconds += amount * 86400
+
+    return int(total_seconds * 1000)
+
+
+def resolve_metrics_time_range(
+    duration: Optional[str],
+    start_time: Optional[str],
+    end_time: Optional[str],
+) -> Tuple[Optional[int], Optional[int], str]:
+    """Resolve start/end epoch milliseconds and describe the window."""
+    now_ms = int(datetime.datetime.now(datetime.timezone.utc).timestamp() * 1000)
+
+    end_ms = parse_epoch_millis(end_time) if end_time else now_ms
+    duration_ms = parse_duration_to_millis(duration)
+    start_ms = parse_epoch_millis(start_time) if start_time else None
+
+    if start_ms is None and duration_ms is not None:
+        start_ms = end_ms - duration_ms
+
+    if start_ms is None and end_time and duration_ms is None:
+        start_ms = end_ms - 3600_000
+
+    if start_ms is None and duration_ms is None:
+        start_ms = end_ms - 3600_000
+
+    if start_ms is not None and end_ms is not None and start_ms > end_ms:
+        start_ms, end_ms = end_ms, start_ms
+
+    desc_parts = []
+    if start_ms is not None:
+        desc_parts.append(f"from {format_timestamp(start_ms)}")
+    if end_ms is not None:
+        desc_parts.append(f"to {format_timestamp(end_ms)}")
+    if not desc_parts:
+        desc_parts.append("time window not specified")
+
+    return start_ms, end_ms, " ".join(desc_parts)
+
+
+def metrics_map_to_series(metrics_map: Dict[str, float]) -> List[Dict[str, float]]:
+    """Convert AMS metrics dict to sorted timestamp/value pairs."""
+    if not metrics_map:
+        return []
+
+    points: List[Dict[str, float]] = []
+    for raw_ts, raw_value in metrics_map.items():
+        ts_ms = parse_epoch_millis(raw_ts)
+        if ts_ms is None:
+            try:
+                ts_ms = _normalize_epoch_ms(float(raw_ts))
+            except (TypeError, ValueError):
+                continue
+        try:
+            value = float(raw_value)
+        except (TypeError, ValueError):
+            continue
+        points.append({"timestamp": ts_ms, "value": value})
+
+    points.sort(key=lambda item: item["timestamp"])
+    return points
+
+
+def summarize_metric_series(points: List[Dict[str, float]]) -> Dict[str, float]:
+    """Compute simple statistics for a metric series."""
+    if not points:
+        return {}
+
+    values = [float(p["value"]) for p in points]
+    if not values:
+        return {}
+
+    first = values[0]
+    last = values[-1]
+    summary = {
+        "count": len(values),
+        "min": min(values),
+        "max": max(values),
+        "avg": sum(values) / len(values),
+        "first": first,
+        "last": last,
+        "delta": last - first,
+        "start_timestamp": points[0]["timestamp"],
+        "end_timestamp": points[-1]["timestamp"],
+    }
+    summary["duration_ms"] = summary["end_timestamp"] - summary["start_timestamp"] if summary["count"] > 1 else 0
+    return summary
+
+
+async def make_ambari_metrics_request(endpoint: str, params: Optional[Dict[str, str]] = None, method: str = "GET") -> Dict:
+    """Perform an HTTP request against the Ambari Metrics API."""
+    start = time.monotonic()
+    param_preview = []
+    if params:
+        for key, value in params.items():
+            if value is None:
+                continue
+            value_str = str(value)
+            if len(value_str) > 80:
+                value_str = value_str[:77] + '…'
+            param_preview.append(f"{key}={value_str}")
+    logger.debug(
+        "AMS_REQ start method=%s endpoint=%s params=%s",
+        method,
+        endpoint,
+        " ".join(param_preview),
+    )
+
+    try:
+        timeout = aiohttp.ClientTimeout(total=AMBARI_METRICS_TIMEOUT)
+        url = f"{AMBARI_METRICS_BASE_URL}{endpoint}"
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            async with session.request(method, url, params=params) as response:
+                elapsed = (time.monotonic() - start) * 1000
+                if response.status == 200:
+                    try:
+                        data = await response.json()
+                    except Exception as json_err:
+                        text_body = await response.text()
+                        logger.warning(
+                            "AMS_REQ json-parse-failure status=%s took=%.1fms endpoint=%s err=%s",
+                            response.status,
+                            elapsed,
+                            endpoint,
+                            json_err,
+                        )
+                        return {"error": f"JSON_PARSE: {json_err}", "raw": text_body}
+
+                    logger.debug(
+                        "AMS_REQ success status=%s took=%.1fms size_hint=%s",
+                        response.status,
+                        elapsed,
+                        len(data) if hasattr(data, "__len__") else "NA",
+                    )
+                    return data
+
+                error_text = await response.text()
+                logger.warning(
+                    "AMS_REQ http-error status=%s took=%.1fms endpoint=%s body_len=%s",
+                    response.status,
+                    elapsed,
+                    endpoint,
+                    len(error_text),
+                )
+                return {"error": f"HTTP {response.status}: {error_text}"}
+
+    except Exception as exc:
+        elapsed = (time.monotonic() - start) * 1000
+        logger.exception("AMS_REQ exception took=%.1fms endpoint=%s", elapsed, endpoint)
+        return {"error": f"Metrics request failed: {exc}"}
+
+
+def parse_metrics_metadata(response_obj: Any) -> List[Dict[str, Any]]:
+    """Parse AMS metadata response into a flat list of metric dictionaries."""
+    if response_obj is None:
+        return []
+
+    if isinstance(response_obj, dict):
+        if response_obj.get("error"):
+            return []
+        section = (
+            response_obj.get("metrics")
+            or response_obj.get("Metrics")
+            or response_obj.get("items")
+            or response_obj.get("MetricsCollection")
+        )
+    elif isinstance(response_obj, list):
+        section = response_obj
+    else:
+        section = None
+
+    if section is None:
+        return []
+
+    entries: List[Dict[str, Any]] = []
+    if isinstance(section, dict):
+        for metric_name, meta in section.items():
+            if not isinstance(meta, dict):
+                continue
+            entry = dict(meta)
+            entry.setdefault("metricname", metric_name)
+            entries.append(entry)
+    elif isinstance(section, list):
+        entries = [entry for entry in section if isinstance(entry, dict)]
+    return entries
+
+
+def _metadata_cache_key(app_id: Optional[str]) -> str:
+    return (app_id or "__all__").strip().lower()
+
+
+async def get_metrics_metadata(app_id: Optional[str] = None, use_cache: bool = True) -> List[Dict[str, Any]]:
+    """Return metric metadata for a specific appId (or all apps if None)."""
+    cache_key = _metadata_cache_key(app_id)
+    now = time.monotonic()
+    if use_cache:
+        cached = _METRICS_METADATA_CACHE.get(cache_key)
+        if cached and now - cached.get("timestamp", 0) < AMBARI_METRICS_METADATA_TTL:
+            return cached.get("entries", [])
+
+    params: Dict[str, str] = {}
+    if app_id:
+        params["appId"] = app_id
+
+    response = await make_ambari_metrics_request("/metrics/metadata", params=params or None)
+    entries = parse_metrics_metadata(response)
+    _METRICS_METADATA_CACHE[cache_key] = {
+        "timestamp": now,
+        "entries": entries,
+    }
+    return entries
+
+
+async def collect_metadata_entries(
+    app_ids: Optional[Iterable[str]] = None,
+    prefer_app: Optional[str] = None,
+    use_cache: bool = True,
+) -> List[Dict[str, Any]]:
+    """Gather metadata entries for given app IDs (defaults to curated list)."""
+    entries: List[Dict[str, Any]] = []
+    seen_keys = set()
+
+    candidate_app_ids: List[str] = []
+    candidate_seen = set()
+
+    if app_ids:
+        for app in app_ids:
+            if not app:
+                continue
+            normalized = app.strip()
+            if not normalized or normalized.lower() in candidate_seen:
+                continue
+            candidate_seen.add(normalized.lower())
+            candidate_app_ids.append(normalized)
+    elif prefer_app:
+        normalized = prefer_app.strip()
+        if normalized and normalized.lower() not in candidate_seen:
+            candidate_seen.add(normalized.lower())
+            candidate_app_ids.append(normalized)
+
+    for curated_app in CURATED_METRIC_APP_IDS:
+        if curated_app.lower() in candidate_seen:
+            continue
+        candidate_seen.add(curated_app.lower())
+        candidate_app_ids.append(curated_app)
+
+    for candidate in candidate_app_ids:
+        normalized = candidate.strip() if isinstance(candidate, str) else ""
+        if not normalized:
+            continue
+        metadata = await get_metrics_metadata(normalized, use_cache=use_cache)
+        for entry in metadata:
+            metric_name = str(entry.get("metricname") or entry.get("metricName") or entry.get("name") or "")
+            app_name = str(entry.get("appid") or entry.get("appId") or entry.get("application") or "")
+            cache_key = (metric_name.lower(), app_name.lower())
+            if cache_key in seen_keys:
+                continue
+            seen_keys.add(cache_key)
+            entries.append(entry)
+
+    return entries
+
+
+def tokenize_metric_queries(queries: Iterable[str]) -> List[str]:
+    """Tokenize user-provided metric strings into normalized search tokens."""
+    tokens: List[str] = []
+    seen = set()
+
+    for raw in queries:
+        if not raw:
+            continue
+        lowered = str(raw).strip().lower()
+        if not lowered:
+            continue
+
+        for candidate in {
+            lowered,
+            lowered.replace('.', ' ').replace(':', ' ').replace('/', ' '),
+            lowered.replace('.', ''),
+            lowered.replace(':', ''),
+            lowered.replace('/', ''),
+        }:
+            for token in _TOKEN_SPLIT_RE.split(candidate):
+                if not token:
+                    continue
+                if token not in seen:
+                    seen.add(token)
+                    tokens.append(token)
+
+    return tokens
+
+
+def score_metric_entry(
+    entry: Dict[str, Any],
+    query_tokens: Iterable[str],
+    prefer_app: Optional[str] = None,
+) -> int:
+    """Return a heuristic score describing how well a metadata entry matches tokens."""
+    metric_name = str(entry.get("metricname") or entry.get("metricName") or entry.get("name") or "")
+    if not metric_name:
+        return 0
+
+    metric_lower = metric_name.lower()
+    compact = re.sub(r"[^a-z0-9]", "", metric_lower)
+    segments = [seg for seg in _TOKEN_SPLIT_RE.split(metric_lower) if seg]
+
+    score = 0
+    token_list = list(query_tokens)
+    if not token_list:
+        return 0
+
+    for token in token_list:
+        if token == metric_lower:
+            score += 60
+        elif metric_lower.endswith(token):
+            score += 18
+        elif token in metric_lower:
+            score += 10
+        elif token in segments:
+            score += 6
+        elif token in compact:
+            score += 5
+
+    description = str(entry.get("description") or entry.get("desc") or "").lower()
+    if description:
+        for token in token_list:
+            if token in description:
+                score += 3
+
+    units = str(entry.get("units") or entry.get("unit") or "").lower()
+    if units:
+        for token in token_list:
+            if token in units:
+                score += 2
+
+    entry_app = str(entry.get("appid") or entry.get("appId") or entry.get("application") or "")
+    if prefer_app and entry_app:
+        pref_lower = prefer_app.lower()
+        app_lower = entry_app.lower()
+        if app_lower == pref_lower:
+            score += 8
+        elif pref_lower in app_lower:
+            score += 4
+
+    if len(metric_name) <= 20:
+        score += 1
+
+    return score
+
+
+def build_metric_suggestions(
+    query_tokens: Iterable[str],
+    metadata_entries: Iterable[Dict[str, Any]],
+    prefer_app: Optional[str] = None,
+    limit: int = 8,
+    min_score: int = 6,
+) -> List[Dict[str, Any]]:
+    """Return best matching metric metadata entries for given tokens."""
+    suggestions: List[Dict[str, Any]] = []
+    seen = set()
+
+    for entry in metadata_entries:
+        metric_name = str(entry.get("metricname") or entry.get("metricName") or entry.get("name") or "")
+        app_name = str(entry.get("appid") or entry.get("appId") or entry.get("application") or "")
+        cache_key = (metric_name.lower(), app_name.lower())
+        if cache_key in seen:
+            continue
+
+        score = score_metric_entry(entry, query_tokens, prefer_app=prefer_app)
+        if score < min_score:
+            continue
+
+        record = {
+            "metricname": metric_name,
+            "appid": app_name,
+            "score": score,
+            "units": entry.get("units") or entry.get("unit"),
+            "description": entry.get("description") or entry.get("desc"),
+        }
+        suggestions.append(record)
+        seen.add(cache_key)
+
+    suggestions.sort(key=lambda item: (-item["score"], item["metricname"]))
+    return suggestions[:limit]
+
+
+def find_curated_metric(query_tokens: Iterable[str], app_hint: Optional[str] = None) -> Optional[Dict[str, str]]:
+    """Return a curated catalog match for the provided tokens (if any)."""
+
+    match = best_catalog_match(list(query_tokens), app_hint=app_hint)
+    if not match:
+        return None
+
+    app_id, entry, score = match
+    return {
+        "metric": entry.metric,
+        "appId": app_id,
+        "label": entry.label,
+        "score": str(score),
+    }
+
+
+def infer_precision_for_window(duration_ms: Optional[int]) -> Optional[str]:
+    """Infer AMS precision parameter from duration (milliseconds)."""
+
+    if not duration_ms or duration_ms <= 0:
+        return None
+
+    for boundary, precision in PRECISION_RULES_MS:
+        if duration_ms <= boundary:
+            return precision
+
+    return None
 
 async def format_single_host_details(host_name: str, cluster_name: str, show_header: bool = True) -> str:
     """
