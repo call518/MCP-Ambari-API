@@ -20,7 +20,7 @@ natural-language token stream to the closest curated metric entry.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, Iterable, List, Optional, Tuple
+from typing import Dict, Iterable, List, Optional, Set, Tuple
 
 
 @dataclass(frozen=True)
@@ -1047,6 +1047,33 @@ COMMON_JVM_METRICS: Tuple[str, ...] = (
 )
 
 
+COMMON_JVM_APPS: Tuple[str, ...] = (
+    "namenode",
+    "datanode",
+    "nodemanager",
+    "resourcemanager",
+)
+
+
+_METRICS_BY_APP: Dict[str, Tuple[str, ...]] = {}
+_METRICS_BY_APP_SET: Dict[str, Set[str]] = {}
+
+
+def _build_metrics_by_app() -> None:
+    for app, entries in CURATED_METRICS.items():
+        metric_names: Set[str] = {entry.metric for entry in entries}
+        if app == "datanode":
+            metric_names.update(DATANODE_BLOCK_METRICS)
+        if app in COMMON_JVM_APPS:
+            metric_names.update(COMMON_JVM_METRICS)
+        ordered = tuple(sorted(metric_names))
+        _METRICS_BY_APP[app] = ordered
+        _METRICS_BY_APP_SET[app] = set(ordered)
+
+
+_build_metrics_by_app()
+
+
 def _normalize_common_metric_key(metric: str) -> str:
     return " ".join(metric.strip().lower().split()) if metric else ""
 
@@ -1070,6 +1097,26 @@ def is_common_jvm_metric(metric_name: Optional[str]) -> bool:
     """Return True if the metric belongs to the shared JVM metric set."""
 
     return resolve_common_jvm_metric_name(metric_name) is not None
+
+
+def get_metrics_for_app(app_id: Optional[str]) -> Tuple[str, ...]:
+    """Return the tuple of supported metrics for the provided appId."""
+
+    canonical = canonicalize_app_id(app_id)
+    if not canonical:
+        return ()
+    return _METRICS_BY_APP.get(canonical, ())
+
+
+def metric_supported_for_app(app_id: Optional[str], metric_name: Optional[str]) -> bool:
+    """Return True when a metric is available for the given appId (exact match)."""
+
+    if not metric_name:
+        return False
+    canonical = canonicalize_app_id(app_id)
+    if not canonical:
+        return False
+    return metric_name in _METRICS_BY_APP_SET.get(canonical, set())
 
 
 def _dedupe_keywords(keywords: Iterable[str]) -> Tuple[str, ...]:
