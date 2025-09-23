@@ -134,7 +134,7 @@ Below is an example screenshot showing how to query the Ambari cluster using MCP
 ## 📈 Metrics & Trends
 
 - `list_common_metrics_catalog`: keyword search against the curated metric catalog (see below) with cached responses. Use `search="heap"` or similar to narrow suggestions before running a time-series query.
-- `query_ambari_metrics`: fetch time-series data; the tool auto-selects curated metric names, falls back to metadata search when needed, and picks a sensible `precision` for the requested window (override with `precision="SECONDS"`, etc., when necessary).
+- `query_ambari_metrics`: fetch time-series data; the tool auto-selects curated metric names, falls back to metadata search when needed, and honors Ambari's default precision unless you explicitly supply `precision="SECONDS"`, etc.
 - `list_ambari_metrics_metadata`: raw AMS metadata explorer for ad-hoc discovery (supports `app_id`, `metric_name_filter`, `host_filter`).
 - `hdfs_dfadmin_report`: produce a DFSAdmin-style capacity/DataNode summary (mirrors `hdfs dfsadmin -report`).
 

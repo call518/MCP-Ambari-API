@@ -80,7 +80,7 @@ Every tool call triggers a real Ambari REST API request. Call tools ONLY when ne
 10. Mentions alerts / current alerts / alert status → get_alerts_history(mode="current") for real-time alert monitoring.
 11. Mentions alert history / past alerts / alert events / alert timeline → get_alerts_history(mode="history") with appropriate filters (state, service, host, time range).
 12. Ambiguous reference ("restart it") → if no prior unambiguous service, ask (or clarify) before calling.
-13. Mentions metrics / usage trend / heat / CPU/disk stats / capacity change → query_ambari_metrics (tool auto-selects curated metric names + precision; fall back to list_common_metrics_catalog or list_ambari_metrics_metadata when exploring entirely new signals).
+13. Mentions metrics / usage trend / heat / CPU/disk stats / capacity change → query_ambari_metrics (tool auto-selects curated metric names; fall back to list_common_metrics_catalog or list_ambari_metrics_metadata when exploring entirely new signals).
 
 ---
 ## 5. Smart Time Context for Natural Language Processing
@@ -334,7 +334,7 @@ Any suggestion to check elsewhere manually instead of using the API tools.
 - "Plot HDFS NameNode safe mode time over the past 6 hours."
 - "Check DataNode bytes written in the last 30 minutes."
 - "Show ResourceManager root queue pending MB for the past day."
-- 💡 **Tip**: metric names are auto-matched from the catalog; override the inferred granularity with `precision` if you need explicit `SECONDS` / `MINUTES` / `HOURS`.
+- 💡 **Tip**: metric names are auto-matched from the catalog; Ambari picks a default granularity for you, but you can override it with `precision="SECONDS"`, `"MINUTES"`, `"HOURS"`, etc., when needed.
 
 **hdfs_dfadmin_report**
 - "Show the HDFS dfsadmin report."

@@ -31,7 +31,6 @@ from mcp_ambari_api.functions import (
     build_metric_suggestions,
     find_curated_metric,
     get_metrics_metadata,
-    infer_precision_for_window,
     fetch_latest_metric_value,
     get_component_hostnames,
 )
@@ -2711,13 +2710,6 @@ async def query_ambari_metrics(
 
     canonical_app_id = metrics_catalog.canonicalize_app_id(app_id)
     normalized_app_hint = canonical_app_id or (app_id.lower() if app_id else None)
-
-    if not precision and start_ms is not None and end_ms is not None:
-        duration_ms = max(0, end_ms - start_ms)
-        inferred_precision = infer_precision_for_window(duration_ms)
-        if inferred_precision:
-            base_params["precision"] = inferred_precision
-            precision = inferred_precision
 
     need_catalog_lookup = False
 
