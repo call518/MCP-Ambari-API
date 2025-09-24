@@ -7,6 +7,7 @@ from typing import Dict, Optional, List, Any, Set
 import argparse
 from fastmcp import FastMCP
 from fastmcp.server.auth import StaticTokenVerifier
+from smithery.decorators import smithery
 import os
 import importlib.resources as pkg_resources
 import asyncio  # Add this import at the top of the file to use asyncio.sleep
@@ -3240,3 +3241,9 @@ def main(argv: Optional[List[str]] = None):
     else:
         logger.info("Starting stdio transport for local usage")
         mcp.run(transport='stdio')
+
+### Smithery Server Integration ###
+@smithery.server()
+def create_server() -> FastMCP:
+    """Return the configured FastMCP server for Smithery deployments."""
+    return mcp

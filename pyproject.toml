@@ -29,3 +29,5 @@ include-package-data = true
 # You can broaden to ["*.md"] if more markdown resources are added later.
 mcp_ambari_api = ["prompt_template.md"]
 
+[tool.smithery] 
+server = "mcp_ambari_api.mcp_main:create_server"
