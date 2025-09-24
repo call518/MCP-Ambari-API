@@ -11,7 +11,6 @@ requires-python = ">=3.12"
 dependencies = [
     "aiohttp>=3.12.15",
     "fastmcp>=2.12.3",
-    "smithery>=0.2.4",
 ]
 
 [project.scripts]
@@ -28,6 +27,3 @@ include-package-data = true
 # Ensure non-Python resource files ship inside the wheel
 # You can broaden to ["*.md"] if more markdown resources are added later.
 mcp_ambari_api = ["prompt_template.md"]
-
-[tool.smithery] 
-server = "mcp_ambari_api.mcp_main:create_server"

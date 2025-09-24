@@ -13,7 +13,6 @@ RUN pip install \
         'uv>=0.8.5' \
         'mcpo>=0.0.17' \
         'fastmcp>=2.12.3' \
-        'aiohttp>=3.12.15' \
-        'smithery>=0.2.4'
+        'aiohttp>=3.12.15'
 
 CMD ["/bin/bash", "/app/scripts/mcp-server-docker-cmd.sh"]
