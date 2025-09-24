@@ -311,7 +311,7 @@ When authentication fails, the server returns:
   "mcpServers": {
     "ambari-api": {
       "command": "uvx",
-      "args": ["--python", "3.11", "mcp-ambari-api"],
+      "args": ["--python", "3.12", "mcp-ambari-api"],
       "env": {
         "AMBARI_HOST": "host.docker.internal",
         "AMBARI_PORT": "8080",
@@ -367,7 +367,7 @@ When authentication fails, the server returns:
   "mcpServers": {
     "ambari-api": {
       "command": "uvx",
-      "args": ["--python", "3.11", "mcp-ambari-api"],
+      "args": ["--python", "3.12", "mcp-ambari-api"],
       "env": {
         "AMBARI_HOST": "localhost",
         "AMBARI_PORT": "7070",
@@ -390,7 +390,7 @@ When authentication fails, the server returns:
   "mcpServers": {
     "Ambari-Cluster-A": {
       "command": "uvx",
-      "args": ["--python", "3.11", "mcp-ambari-api"],
+      "args": ["--python", "3.12", "mcp-ambari-api"],
       "env": {
         "AMBARI_HOST": "a.foo.com",
         "AMBARI_PORT": "8080",
@@ -402,7 +402,7 @@ When authentication fails, the server returns:
     },
     "Ambari-Cluster-B": {
       "command": "uvx",
-      "args": ["--python", "3.11", "mcp-ambari-api"],
+      "args": ["--python", "3.12", "mcp-ambari-api"],
       "env": {
         "AMBARI_HOST": "b.bar.com",
         "AMBARI_PORT": "8080",
@@ -541,7 +541,7 @@ This MCP server provides the following tools for Ambari cluster management:
 
 ### Technologies Used
 
-- **Language**: Python 3.11
+- **Language**: Python 3.12
 - **Framework**: Model Context Protocol (MCP)
 - **API**: Apache Ambari REST API
 - **Transport**: stdio (local) and streamable-http (remote)
@@ -551,14 +551,14 @@ This MCP server provides the following tools for Ambari cluster management:
 
 - WSL2(networkingMode = bridged) + Docker-Desktop
   - `.wslconfig`: tested with `networkingMode = bridged`
-- Python 3.11 venv
+- Python 3.12 venv
 
   ```bash
   ### Option-1: with uv
-  uv venv --python 3.11 --seed
+  uv venv --python 3.12 --seed
 
   ### Option-2: with pip
-  python3.11 -m venv .venv
+  python3.12 -m venv .venv
   source .venv/bin/activate
   pip install -U pip
   ```

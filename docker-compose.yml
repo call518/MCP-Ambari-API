@@ -15,7 +15,7 @@ services:
 
   mcp-server:
     env_file: .env
-    image: call518/mcp-server-ambari-api:1.0.0
+    image: call518/mcp-server-ambari-api:1.0.1
     container_name: mcp-ambari-api-mcp-server
     ports:
       - "${DOCKER_EXTERNAL_PORT_MCP_SERVER}:8000" ### (WARNING) Must be same with port number of 'FASTMCP_PORT', 'mcp-config.json' and 'mcp-config.json.http'
@@ -35,7 +35,7 @@ services:
 
   mcpo-proxy:
     env_file: .env
-    image: call518/mcpo-proxy-ambari-api:1.0.2
+    image: call518/mcpo-proxy-ambari-api:1.0.3
     container_name: mcp-ambari-api-mcpo-proxy
     depends_on:
       mcp-server:
