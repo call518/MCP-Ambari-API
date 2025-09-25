@@ -27,8 +27,6 @@
 
 **MCP Ambari API** is a powerful Model Context Protocol (MCP) server that enables seamless Apache Ambari cluster management through natural language commands. Built for DevOps engineers, data engineers, and system administrators who work with Hadoop ecosystems.
 
----
-
 ### Features
 
 - ✅ **Interactive Ambari Operations Hub** – Provides an MCP-based foundation for querying and managing services through natural language instead of console or UI interfaces.
