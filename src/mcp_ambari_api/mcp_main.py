@@ -11,6 +11,7 @@ import os
 import importlib.resources as pkg_resources
 import asyncio  # Add this import at the top of the file to use asyncio.sleep
 import logging
+import json
 from mcp_ambari_api.functions import (
     format_timestamp,
     format_single_host_details,
@@ -18,7 +19,6 @@ from mcp_ambari_api.functions import (
     make_ambari_metrics_request,
     AMBARI_CLUSTER_NAME,
     AMBARI_METRICS_BASE_URL,
-    CURATED_METRIC_APP_IDS,
     log_tool,
     format_alerts_output,
     get_current_time_context,
@@ -28,8 +28,10 @@ from mcp_ambari_api.functions import (
     summarize_metric_series,
     fetch_latest_metric_value,
     get_component_hostnames,
+    ensure_metric_catalog,
+    canonicalize_app_id,
+    get_metrics_for_app,
 )
-import mcp_ambari_api.metrics_catalog as metrics_catalog
 # from .functions import (
 #     format_timestamp, 
 #     format_single_host_details, 
@@ -2192,15 +2194,20 @@ async def list_ambari_metrics_metadata(
     app_id: Optional[str] = None,
     metric_name_filter: Optional[str] = None,
     host_filter: Optional[str] = None,
-    limit: int = 40,
+    search: Optional[str] = None,
+    limit: int = 50,
     include_dimensions: bool = False,
 ) -> str:
     """Retrieve metric metadata from Ambari Metrics service with optional filters."""
-    canonical_app = metrics_catalog.canonicalize_app_id(app_id)
+    catalog, lookup = await ensure_metric_catalog()
+    canonical_app = canonicalize_app_id(app_id, lookup)
+    resolved_app = None
+    if canonical_app:
+        resolved_app = lookup.get(canonical_app.lower(), canonical_app)
 
     params: Dict[str, str] = {}
-    if canonical_app:
-        params["appId"] = canonical_app
+    if resolved_app:
+        params["appId"] = resolved_app
     elif app_id:
         params["appId"] = app_id
     if host_filter:
@@ -2224,9 +2231,31 @@ async def list_ambari_metrics_metadata(
     items: List[Dict] = []
     if isinstance(raw_section, dict):
         for metric_name, meta in raw_section.items():
-            entry = dict(meta or {})
-            entry.setdefault("metricname", metric_name)
-            items.append(entry)
+            if isinstance(meta, dict):
+                entry = dict(meta)
+                entry.setdefault("metricname", metric_name)
+                items.append(entry)
+            elif isinstance(meta, list):
+                for element in meta:
+                    if isinstance(element, dict):
+                        entry = dict(element)
+                        entry.setdefault("metricname", metric_name)
+                        items.append(entry)
+                    else:
+                        entry = {
+                            "metricname": str(element),
+                            "appid": metric_name,
+                            "appId": metric_name,
+                        }
+                        items.append(entry)
+            else:
+                entry = {
+                    "metricname": str(metric_name),
+                    "appid": metric_name,
+                    "appId": metric_name,
+                    "value": meta,
+                }
+                items.append(entry)
     elif isinstance(raw_section, list):
         items = [entry for entry in raw_section if isinstance(entry, dict)]
     else:
@@ -2264,14 +2293,33 @@ async def list_ambari_metrics_metadata(
             items = filtered
         filters_applied.append(f"host~{host_filter}")
 
+    search_lower = (search or "").strip().lower()
+    if search_lower:
+        def search_matches(entry: Dict) -> bool:
+            haystack_parts = [
+                str(entry.get("metricname") or entry.get("metricName") or ""),
+                str(entry.get("appid") or entry.get("appId") or entry.get("application") or ""),
+                str(entry.get("description") or entry.get("desc") or ""),
+                str(entry.get("units") or entry.get("unit") or ""),
+                str(entry.get("type") or entry.get("metricType") or ""),
+            ]
+            haystack = " ".join(part.lower() for part in haystack_parts if part)
+            return search_lower in haystack
+
+        filtered = [entry for entry in items if search_matches(entry)]
+        if filtered:
+            items = filtered
+        filters_applied.append(f"search~{search_lower}")
+
     if not items:
-        if canonical_app and canonical_app in metrics_catalog.CURATED_METRICS:
-            curated_metrics = metrics_catalog.get_metrics_for_app(canonical_app)
+        fallback_app = resolved_app or canonical_app
+        if fallback_app:
+            curated_metrics = catalog.get(fallback_app) or await get_metrics_for_app(fallback_app)
             limited_metrics = curated_metrics[:max(1, limit)] if limit > 0 else curated_metrics
 
             lines = [
-                "Ambari Metrics Catalog (curated fallback)",
-                f"appId={canonical_app}",
+                "Ambari Metrics Catalog (metadata fallback)",
+                f"appId={fallback_app}",
                 "",
                 "Exact metric names available for this appId:",
             ]
@@ -2284,9 +2332,9 @@ async def list_ambari_metrics_metadata(
                         f"    … {len(curated_metrics) - len(limited_metrics)} additional metrics (increase limit)"
                     )
             else:
-                lines.append("  <no curated metrics recorded>")
+                lines.append("  <no cached metrics recorded>")
 
-            component_name = HOST_FILTER_REQUIRED_COMPONENTS.get(canonical_app)
+            component_name = HOST_FILTER_REQUIRED_COMPONENTS.get(fallback_app.lower())
             if component_name:
                 component_hosts = await get_component_hostnames(component_name)
                 lines.append("")
@@ -2301,9 +2349,16 @@ async def list_ambari_metrics_metadata(
 
             lines.append("")
             lines.append(
-                'Next: call query_ambari_metrics(metric_names="<exact_name>", app_id="%s", ...)' % canonical_app
+                'Next: call query_ambari_metrics(metric_names="<exact_name>", app_id="%s", ...)' % fallback_app
             )
             lines.append("Hostname is optional; omit it for cluster-wide data or supply explicit hosts to narrow the scope.")
+
+            if limit <= 0:
+                lines.append("Note: limit<=0 → entire catalog was shown.")
+
+            if filters_applied:
+                lines.append("")
+                lines.append(f"Applied filters: {', '.join(filters_applied)}")
 
             return "\n".join(lines)
 
@@ -2367,35 +2422,35 @@ async def list_common_metrics_catalog(
 
     _ = (min_score, include_description)
     limit = max(1, limit)
+    catalog, lookup = await ensure_metric_catalog()
 
-    canonical_app = metrics_catalog.canonicalize_app_id(app_id)
-
-    if app_id and app_id.lower() in {"all", "*"}:
-        target_app_ids = list(metrics_catalog.CURATED_METRICS.keys())
-    elif canonical_app:
-        target_app_ids = [canonical_app]
-    elif app_id:
-        target_app_ids = []
-        for item in app_id.split(','):
-            trimmed = item.strip()
-            if not trimmed:
+    def resolve_targets(raw_values: List[str]) -> List[str]:
+        ordered: List[str] = []
+        seen_local: Set[str] = set()
+        for value in raw_values:
+            resolved = canonicalize_app_id(value, lookup)
+            if not resolved:
                 continue
-            canon = metrics_catalog.canonicalize_app_id(trimmed) or trimmed.lower()
-            if canon in metrics_catalog.CURATED_METRICS and canon not in target_app_ids:
-                target_app_ids.append(canon)
-        if not target_app_ids:
-            target_app_ids = list(metrics_catalog.CURATED_METRICS.keys())
-    else:
-        target_app_ids = list(metrics_catalog.CURATED_METRICS.keys())
+            target = lookup.get(resolved.lower(), resolved)
+            lowered = target.lower()
+            if lowered in seen_local:
+                continue
+            seen_local.add(lowered)
+            ordered.append(target)
+        return ordered
 
-    ordered: List[str] = []
-    seen = set()
-    for app_name in target_app_ids:
-        canonical = metrics_catalog.canonicalize_app_id(app_name)
-        if canonical and canonical in metrics_catalog.CURATED_METRICS and canonical not in seen:
-            ordered.append(canonical)
-            seen.add(canonical)
-    target_app_ids = ordered
+    target_app_ids: List[str]
+    if isinstance(app_id, str) and app_id.strip():
+        app_token = app_id.strip()
+        if app_token.lower() in {"all", "*"}:
+            target_app_ids = sorted(catalog.keys())
+        else:
+            raw_targets = [item.strip() for item in app_token.split(',') if item.strip()]
+            target_app_ids = resolve_targets(raw_targets or [app_token])
+            if not target_app_ids:
+                target_app_ids = sorted(catalog.keys())
+    else:
+        target_app_ids = sorted(catalog.keys())
 
     search_lower = (search or "").strip().lower()
 
@@ -2409,7 +2464,8 @@ async def list_common_metrics_catalog(
 
     matched = 0
     for app_name in target_app_ids:
-        metrics = metrics_catalog.get_metrics_for_app(app_name)
+        metrics = await get_metrics_for_app(app_name)
+        catalog[app_name] = metrics
         if not metrics:
             continue
         filtered = [metric for metric in metrics if not search_lower or search_lower in metric.lower()]
@@ -2433,6 +2489,94 @@ async def list_common_metrics_catalog(
 
     return "\n".join(lines)
 
+
+@mcp.resource("ambari-metrics://catalog/{selector}{?refresh}")
+async def ambari_metrics_catalog_resource(
+    selector: str = "all",
+    refresh: Optional[str] = None,
+) -> str:
+    """Return AMS metric metadata as compact JSON.
+
+    Supported selectors:
+    - `all` (default): full appId → metrics map.
+    - `apps`: list available appIds only.
+    - `<appId>`: metrics for the given app (synonyms allowed).
+    - `app/<appId>`: same as above, explicit prefix for clarity.
+    """
+
+    refresh_requested = False
+    if isinstance(refresh, str):
+        refresh_requested = refresh.strip().lower() in {"1", "true", "yes", "refresh", "force"}
+
+    use_cache = not refresh_requested
+    catalog, lookup = await ensure_metric_catalog(use_cache=use_cache)
+
+    selector_normalized = (selector or "all").strip()
+    selector_lower = selector_normalized.lower()
+
+    async def metrics_for(app_identifier: str) -> Dict[str, List[str]]:
+        metrics = await get_metrics_for_app(app_identifier)
+        resolved_name = canonicalize_app_id(app_identifier, lookup)
+        if resolved_name:
+            resolved_key = lookup.get(resolved_name.lower(), resolved_name)
+        else:
+            lower = app_identifier.lower()
+            resolved_key = lookup.get(lower, next((app for app in catalog if app.lower() == lower), app_identifier))
+        return {resolved_key: metrics}
+
+    payload: Any
+    if selector_lower in {"all", "*"}:
+        non_empty = {app: metrics for app, metrics in sorted(catalog.items()) if metrics}
+        payload = non_empty or {app: metrics for app, metrics in sorted(catalog.items())}
+    elif selector_lower == "apps":
+        payload = sorted(catalog.keys())
+    elif selector_lower.startswith("app/") and len(selector_lower) > 4:
+        target = selector_normalized.split("/", 1)[1]
+        payload = await metrics_for(target)
+    else:
+        payload = await metrics_for(selector_normalized)
+
+    return json.dumps(payload, separators=(",", ":"))
+
+
+@mcp.tool(title="List Ambari Metric Apps")
+@log_tool
+async def list_ambari_metric_apps(
+    refresh: bool = False,
+    include_counts: bool = True,
+    limit: int = 200,
+) -> str:
+    """Return discovered AMS appIds, optionally with metric counts."""
+
+    catalog, _ = await ensure_metric_catalog(use_cache=not refresh)
+    if not catalog:
+        return "No Ambari Metrics appIds discovered."
+
+    app_items = sorted(catalog.items(), key=lambda item: item[0])
+    limit = max(1, limit)
+
+    lines = [
+        "Ambari Metrics AppIds",
+        f"Total discovered: {len(app_items)}",
+        f"Refresh requested: {'yes' if refresh else 'no'}",
+        "",
+    ]
+
+    display_items = app_items if limit <= 0 else app_items[:limit]
+    for app_name, metrics in display_items:
+        if include_counts:
+            lines.append(f"- {app_name} ({len(metrics)} metric(s))")
+        else:
+            lines.append(f"- {app_name}")
+
+    if limit > 0 and len(app_items) > limit:
+        lines.append("")
+        lines.append(f"… {len(app_items) - limit} additional appIds not shown (increase limit).")
+
+    lines.append("")
+    lines.append("Tip: Use ambari-metrics://catalog/<appId> or list_common_metrics_catalog(app_id=…) to inspect metric names.")
+
+    return "\n".join(lines)
 
 
 @mcp.tool(title="HDFS DFSAdmin Report")
@@ -2725,8 +2869,9 @@ async def query_ambari_metrics(
     requested_metric_list = [name.strip() for name in raw_metric_arg.split(',') if name.strip()]
     user_supplied_metric_names = bool(requested_metric_list)
 
-    provided_app_id = app_id.strip() if isinstance(app_id, str) else None
-    available_apps = sorted(metrics_catalog.CURATED_METRICS.keys())
+    provided_app_id = app_id.strip() if isinstance(app_id, str) and app_id.strip() else None
+    catalog, lookup = await ensure_metric_catalog()
+    available_apps = sorted(catalog.keys())
 
     if not provided_app_id:
         lines = [
@@ -2744,8 +2889,12 @@ async def query_ambari_metrics(
             lines.append(f"  - {candidate}")
         return "\n".join(lines)
 
-    canonical_app_id = metrics_catalog.canonicalize_app_id(provided_app_id)
-    if canonical_app_id not in metrics_catalog.CURATED_METRICS:
+    canonical_app_id = canonicalize_app_id(provided_app_id, lookup)
+    resolved_app_id = None
+    if canonical_app_id:
+        resolved_app_id = lookup.get(canonical_app_id.lower(), canonical_app_id)
+
+    if not resolved_app_id or resolved_app_id not in catalog:
         lines = [
             "Ambari Metrics Query",
             f"Endpoint: {AMBARI_METRICS_BASE_URL}/metrics",
@@ -2764,10 +2913,10 @@ async def query_ambari_metrics(
     base_params: Dict[str, object] = {
         "startTime": start_ms,
         "endTime": end_ms,
-        "appId": canonical_app_id,
+        "appId": resolved_app_id,
     }
-
-    available_metrics = metrics_catalog.get_metrics_for_app(canonical_app_id)
+    available_metrics = await get_metrics_for_app(resolved_app_id)
+    catalog[resolved_app_id] = available_metrics
 
     hostnames_display: Optional[str] = None
     if hostnames:
@@ -2776,7 +2925,7 @@ async def query_ambari_metrics(
             base_params["hostname"] = sanitized_hosts
             hostnames_display = sanitized_hosts
 
-    component_name = HOST_FILTER_REQUIRED_COMPONENTS.get(canonical_app_id)
+    component_name = HOST_FILTER_REQUIRED_COMPONENTS.get(resolved_app_id.lower())
     component_hosts: Optional[List[str]] = None
 
     async def ensure_component_hosts() -> List[str]:
@@ -2799,7 +2948,7 @@ async def query_ambari_metrics(
         resolved_label = (
             resolved_label_override
             if resolved_label_override is not None
-            else canonical_app_id
+            else resolved_app_id
         )
         base_lines.append(f"Resolved appId: {resolved_label}")
         base_lines.append(f"Hosts: {hostnames_display or 'cluster / default scope'}")
@@ -2812,7 +2961,7 @@ async def query_ambari_metrics(
         return base_lines
 
     if not user_supplied_metric_names:
-        lines = build_base_output_lines("<pending>", canonical_app_id)
+        lines = build_base_output_lines("<pending>", resolved_app_id)
         lines.append("")
         lines.append("Explicit metric_names parameter is required for this app (exact matches only).")
         lines.append("Available metrics:")
@@ -2913,7 +3062,7 @@ async def query_ambari_metrics(
     metric_entries, error_text = extract_metric_entries(response)
     attempt_records.append(
         {
-            "appId": canonical_app_id,
+            "appId": resolved_app_id,
             "count": str(len(metric_entries)),
             "error": error_text,
         }
@@ -2923,7 +3072,7 @@ async def query_ambari_metrics(
     else:
         last_error = error_text
 
-    lines: List[str] = build_base_output_lines(resolved_metric_display, canonical_app_id)
+    lines: List[str] = build_base_output_lines(resolved_metric_display, resolved_app_id)
     lines.append("")
 
     def format_value(val: Optional[float]) -> str:

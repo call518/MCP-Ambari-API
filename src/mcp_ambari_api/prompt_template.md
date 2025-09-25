@@ -55,8 +55,10 @@ Every tool call triggers a real Ambari REST API request. Call tools ONLY when ne
 | Alert history / past alerts / alert events | get_alerts_history(mode="history") | Historical alert events | Filter by state/service/host/time |
 | Legacy current alerts (deprecated) | get_current_alerts | Active alerts | Use get_alerts_history(mode="current") instead |
 | Legacy alert history (deprecated) | get_alert_history | Historical alerts | Use get_alerts_history(mode="history") instead |
-| Curated metrics catalog / quick search | list_common_metrics_catalog | Exact metric names per app | Use `search=` to filter; copy identifiers before metrics queries |
-| Ambari metrics catalog / metric discovery | list_ambari_metrics_metadata | Metric metadata (units, scope) | Narrow with app_id/metric/host filters |
+| Live metrics catalog / quick search | list_common_metrics_catalog | Exact metric names per app | Use `search=` to filter; copy identifiers before metrics queries |
+| AppId discovery only | list_ambari_metric_apps | List `appId`s (optionally with counts) | Use `refresh=true` to bypass cache, adjust `limit` or `include_counts` |
+| Metadata resource (JSON) | `ambari-metrics://catalog/all` | Entire appId→metrics map | Add `?refresh=true` to bypass cache; use `/apps` or `/<appId>` variants |
+| Ambari metrics catalog / metric discovery | list_ambari_metrics_metadata | Metric metadata (units, scope) | Narrow with app_id/metric/host/search filters; use limit (default 50) |
 | Ambari metrics trends / time series | query_ambari_metrics | Summaries + optional datapoints | Requires explicit `app_id` + exact `metric_names`; hostnames auto-added for DN/NM |
 | DFS admin-style capacity report | hdfs_dfadmin_report | Cluster capacity + DataNode status summary | Recreates `hdfs dfsadmin -report` via metrics |
 | Get prompt template | get_prompt_template | Template sections | For AI system prompts |

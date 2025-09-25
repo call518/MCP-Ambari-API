@@ -139,18 +139,16 @@ Below is an example screenshot showing how to query the Ambari cluster using MCP
 
 ## 📈 Metrics & Trends
 
-- `list_common_metrics_catalog`: keyword search against the curated metric catalog (see below) with cached responses. Use `search="heap"` or similar to narrow suggestions before running a time-series query.
+- `list_common_metrics_catalog`: keyword search against the live metadata-backed metric catalog (cached locally). Use `search="heap"` or similar to narrow suggestions before running a time-series query.
+- `list_ambari_metric_apps`: list discovered AMS `appId` values, optionally including metric counts; pass `refresh=true` or `limit` to control output.
 - `query_ambari_metrics`: fetch time-series data; the tool auto-selects curated metric names, falls back to metadata search when needed, and honors Ambari's default precision unless you explicitly supply `precision="SECONDS"`, etc.
-- `list_ambari_metrics_metadata`: raw AMS metadata explorer for ad-hoc discovery (supports `app_id`, `metric_name_filter`, `host_filter`).
+- `list_ambari_metrics_metadata`: raw AMS metadata explorer for ad-hoc discovery (supports `app_id`, `metric_name_filter`, `host_filter`, `search` and adjustable `limit`, default 50).
 - `hdfs_dfadmin_report`: produce a DFSAdmin-style capacity/DataNode summary (mirrors `hdfs dfsadmin -report`).
 
-**Supported Metric Catalog (curated subset)**
-- `ambari_server`: events.alerts, events.alerts.avg, events.requests, events.requests.avg, events.agentactions, events.agentactions.avg, events.services, events.hosts, events.topology_update, live_hosts, alert_definitions
-- `namenode`: jvm.JvmMetrics.MemHeapUsedM, jvm.JvmMetrics.MemHeapCommittedM, dfs.FSNamesystem.CapacityTotalGB, dfs.FSNamesystem.CapacityRemainingGB, dfs.FSNamesystem.CapacityUsedGB, dfs.FSNamesystem.UnderReplicatedBlocks, dfs.FSNamesystem.PendingReplicationBlocks, dfs.namenode.PendingDeleteBlocksCount, dfs.namenode.GetBlockLocations, dfs.namenode.SafeModeTime, jvm.JvmMetrics.GcTimeMillis, rpc.rpc.client.RpcAuthenticationSuccesses
-- `datanode`: dfs.datanode.BlocksRead/Written/Replicated/Removed, dfs.datanode.BlocksCached/Uncached, dfs.datanode.BlocksInPendingIBR/BlocksReceivingInPendingIBR/BlocksReceivedInPendingIBR/BlocksDeletedInPendingIBR, dfs.datanode.BlocksVerified/BlockVerificationFailures, dfs.datanode.BlockChecksumOp*, dfs.datanode.BlockReports*, dfs.datanode.CopyBlockOp*, dfs.datanode.DataNodeBlockRecoveryWorkerCount, dfs.datanode.IncrementalBlockReports*, dfs.datanode.RamDiskBlocks* (deleted/evicted/lazyPersist/readHits/write), dfs.datanode.ReadBlockOp*, dfs.datanode.ReplaceBlockOp*, dfs.datanode.SendDataPacketBlockedOnNetworkNanos*, dfs.datanode.WriteBlockOp*, FSDatasetState...FsDatasetImpl.{Capacity,DfsUsed,Remaining}, dfs.datanode.DataNodeActiveXceiversCount, cpu_user, cpu_system, bytes_in, bytes_out, disk_total
-- `nodemanager`: yarn.NodeManagerMetrics.AllocatedVCores, yarn.NodeManagerMetrics.AvailableVCores, yarn.NodeManagerMetrics.AllocatedGB, yarn.NodeManagerMetrics.AvailableGB, yarn.NodeManagerMetrics.AllocatedContainers, yarn.NodeManagerMetrics.ContainersCompleted, yarn.NodeManagerMetrics.ContainersFailed, yarn.NodeManagerMetrics.ContainersKilled, yarn.NodeManagerMetrics.ContainerLaunchDurationAvgTime, bytes_out, cpu_user, mem_total
-- `resourcemanager`: yarn.QueueMetrics.Queue=root.AllocatedMB, yarn.QueueMetrics.Queue=root.AllocatedVCores, yarn.QueueMetrics.Queue=root.PendingMB, yarn.QueueMetrics.Queue=root.PendingVCores, yarn.QueueMetrics.Queue=root.AppsRunning, yarn.QueueMetrics.Queue=root.default.AllocatedMB, yarn.QueueMetrics.Queue=root.default.PendingMB, yarn.QueueMetrics.Queue=root.default.AppsPending, yarn.QueueMetrics.Queue=root.default.AllocatedContainers, yarn.QueueMetrics.Queue=root.default.AggregateContainersAllocated, yarn.ClusterMetrics.AMLaunchDelayAvgTime, yarn.PartitionQueueMetrics.Queue=root.AppsSubmitted, rpc.rpc.NumOpenConnections, jvm.JvmMetrics.MemHeapUsedM
-- Need another metric? Add the exact name under the appropriate appId in `BASE_METRICS_BY_APP` inside `src/mcp_ambari_api/metrics_catalog.py`; it will appear in the per-app catalog. Natural-language ranking has been removed—queries now require exact metric names.
+**Live Metric Catalog (via AMS metadata)**
+- Metric names are discovered on demand from `/ws/v1/timeline/metrics/metadata` and cached for quick reuse.
+- Use `list_common_metrics_catalog` or the `ambari-metrics://catalog/all` resource (append `?refresh=true` to bypass the cache) to inspect the latest `appId → metric` mapping. Query `ambari-metrics://catalog/apps` to list appIds or `ambari-metrics://catalog/<appId>` for a single app.
+- Typical appIds include `ambari_server`, `namenode`, `datanode`, `nodemanager`, `resourcemanager`, and `HOST`, but the list adapts to whatever the Ambari Metrics service advertises in your cluster.
 
 ---
 
@@ -159,7 +157,7 @@ Below is an example screenshot showing how to query the Ambari cluster using MCP
 Recent updates removed natural-language metric guessing in favor of deterministic, catalog-driven lookups. Keep the following rules in mind when you (or an LLM agent) call `query_ambari_metrics`:
 
 1. **Always pass an explicit `app_id`.** If it is missing or unsupported, the tool returns a list of valid appIds and aborts so you can choose one manually.
-2. **Specify exact metric names.** Use `list_common_metrics_catalog(app_id="<target>", search="keyword")` to browse the curated per-app metric set and copy the identifier (e.g., `jvm.JvmMetrics.MemHeapUsedM`).
+2. **Specify exact metric names.** Use `list_common_metrics_catalog(app_id="<target>", search="keyword")`, `list_ambari_metric_apps` (to discover appIds), or the `ambari-metrics://catalog/<appId>` resource to browse the live per-app metric set and copy the identifier (e.g., `jvm.JvmMetrics.MemHeapUsedM`).
 3. **Host-scope behavior**: When `hostnames` is omitted the API returns cluster-wide aggregates. Provide one or more hosts (comma-separated) to focus on specific nodes.
 4. **No fuzzy matches.** The server now calls Ambari exactly as requested. If the metric is wrong or empty, Ambari will simply return no datapoints—double-check the identifier via `/ws/v1/timeline/metrics/metadata`.
 

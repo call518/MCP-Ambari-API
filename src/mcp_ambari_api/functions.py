@@ -10,12 +10,10 @@ import datetime
 import logging
 import time
 from datetime import timedelta
-from typing import Dict, Optional, Tuple, List, Any, Iterable
+from typing import Dict, Optional, Tuple, List, Any, Iterable, Set
 import re
 from base64 import b64encode
 from functools import wraps
-
-import mcp_ambari_api.metrics_catalog as metrics_catalog
 
 # Set up logging
 logger = logging.getLogger("AmbariService")
@@ -84,6 +82,7 @@ PRECISION_RULES_MS = (
 
 # Cached metadata settings
 AMBARI_METRICS_METADATA_TTL = float(os.environ.get("AMBARI_METRICS_METADATA_TTL", "300"))
+# Default appIds we prioritise when metadata discovery yields no entries.
 CURATED_METRIC_APP_IDS = [
     "ambari_server",
     "namenode",
@@ -91,6 +90,26 @@ CURATED_METRIC_APP_IDS = [
     "nodemanager",
     "resourcemanager",
 ]
+
+# Synonyms used to resolve user-provided appId hints to canonical AMS identifiers.
+APP_SYNONYMS: Dict[str, Tuple[str, ...]] = {
+    "HOST": ("host", "hardware", "system"),
+    "ambari_server": ("ambari", "server", "ambari_server"),
+    "namenode": ("namenode", "hdfs", "nn", "name node"),
+    "datanode": ("datanode", "dn", "data node"),
+    "nodemanager": ("nodemanager", "nm", "node manager"),
+    "resourcemanager": ("resourcemanager", "rm", "resource manager", "yarn"),
+}
+
+# AppIds that should not surface in catalog listings (internal collectors, smoke tests, etc.).
+EXCLUDED_APP_IDS = {"ams-hbase", "amssmoketestfake"}
+
+# Cache grouping of appId → metric name list built from AMS metadata responses.
+_DYNAMIC_CATALOG_CACHE: Dict[str, Any] = {
+    "timestamp": 0.0,
+    "catalog": {},           # str (appId as returned by AMS) -> List[str]
+    "lookup": {},            # str (lowercase appId) -> canonical appId
+}
 
 # Private caches for metadata responses (key → {timestamp, entries})
 _METRICS_METADATA_CACHE: Dict[str, Dict[str, Any]] = {}
@@ -457,25 +476,68 @@ def parse_metrics_metadata(response_obj: Any) -> List[Dict[str, Any]]:
             or response_obj.get("items")
             or response_obj.get("MetricsCollection")
         )
+        if section is None:
+            section = response_obj
     elif isinstance(response_obj, list):
         section = response_obj
     else:
-        section = None
-
-    if section is None:
         return []
 
     entries: List[Dict[str, Any]] = []
     if isinstance(section, dict):
-        for metric_name, meta in section.items():
-            if not isinstance(meta, dict):
+        for key, value in section.items():
+            if isinstance(value, list):
+                for item in value:
+                    if not isinstance(item, dict):
+                        continue
+                    entry = dict(item)
+                    if isinstance(key, str):
+                        entry.setdefault("appid", key)
+                        entry.setdefault("appId", key)
+                    entries.append(entry)
                 continue
-            entry = dict(meta)
-            entry.setdefault("metricname", metric_name)
+
+            if not isinstance(value, dict):
+                continue
+
+            # Direct metric metadata dictionary.
+            if any(field in value for field in ("metricname", "metricName", "metric_name")):
+                entry = dict(value)
+                metric_name = (
+                    entry.get("metricname")
+                    or entry.get("metricName")
+                    or entry.get("metric_name")
+                )
+                if metric_name is None and isinstance(key, str):
+                    entry["metricname"] = key
+                entries.append(entry)
+                continue
+
+            # Nested structure such as {"metrics": {...}}; flatten individual metrics.
+            nested_metrics = value.get("metrics") if isinstance(value, dict) else None
+            if isinstance(nested_metrics, dict):
+                for metric_name, meta in nested_metrics.items():
+                    if not isinstance(meta, dict):
+                        continue
+                    entry = dict(meta)
+                    entry.setdefault("metricname", metric_name)
+                    if isinstance(key, str):
+                        entry.setdefault("appid", key)
+                        entry.setdefault("appId", key)
+                    entries.append(entry)
+                continue
+
+            entry = dict(value)
+            if isinstance(key, str) and not entry.get("metricname"):
+                entry["metricname"] = key
             entries.append(entry)
+
     elif isinstance(section, list):
-        entries = [entry for entry in section if isinstance(entry, dict)]
-        return entries
+        for item in section:
+            if isinstance(item, dict):
+                entries.append(dict(item))
+
+    return entries
 
 
 def _metadata_cache_key(app_id: Optional[str]) -> str:
@@ -497,11 +559,182 @@ async def get_metrics_metadata(app_id: Optional[str] = None, use_cache: bool = T
 
     response = await make_ambari_metrics_request("/metrics/metadata", params=params or None)
     entries = parse_metrics_metadata(response)
+
+    provided_app = app_id.strip() if isinstance(app_id, str) and app_id.strip() else None
+    for entry in entries:
+        app_hint = (
+            entry.get("appid")
+            or entry.get("appId")
+            or entry.get("application")
+            or provided_app
+        )
+        if app_hint:
+            app_str = str(app_hint)
+            entry["appid"] = app_str
+            entry["appId"] = app_str
+
+        metric_hint = (
+            entry.get("metricname")
+            or entry.get("metricName")
+            or entry.get("metric_name")
+        )
+        if metric_hint:
+            entry["metricname"] = str(metric_hint)
+
     _METRICS_METADATA_CACHE[cache_key] = {
         "timestamp": now,
         "entries": entries,
     }
     return entries
+
+
+def _normalize_app_key(app_id: str) -> str:
+    return app_id.strip().lower()
+
+
+def _is_excluded_app(app_id: Optional[str]) -> bool:
+    if not app_id:
+        return False
+    return app_id.strip().lower() in EXCLUDED_APP_IDS
+
+
+async def ensure_metric_catalog(use_cache: bool = True) -> Tuple[Dict[str, List[str]], Dict[str, str]]:
+    """Return (catalog, lookup) built from AMS metadata, refreshing when cache expires."""
+    global _DYNAMIC_CATALOG_CACHE
+
+    now = time.monotonic()
+    cached_catalog = _DYNAMIC_CATALOG_CACHE.get("catalog") or {}
+    cached_lookup = _DYNAMIC_CATALOG_CACHE.get("lookup") or {}
+    cached_timestamp = float(_DYNAMIC_CATALOG_CACHE.get("timestamp", 0.0))
+
+    if use_cache and cached_catalog and now - cached_timestamp < AMBARI_METRICS_METADATA_TTL:
+        return cached_catalog, cached_lookup
+
+    entries = await get_metrics_metadata(None, use_cache=use_cache)
+
+    # Fallback: probe common apps individually if the bulk metadata query returns nothing.
+    if not entries:
+        aggregated: List[Dict[str, Any]] = []
+        for fallback_app in CURATED_METRIC_APP_IDS:
+            if _is_excluded_app(fallback_app):
+                continue
+            fallback_entries = await get_metrics_metadata(fallback_app, use_cache=use_cache)
+            if fallback_entries:
+                aggregated.extend(fallback_entries)
+        entries = aggregated
+
+    metrics_by_app: Dict[str, Set[str]] = {}
+    lookup: Dict[str, str] = {}
+
+    for entry in entries:
+        app_hint = entry.get("appid") or entry.get("appId") or entry.get("application")
+        metric_hint = entry.get("metricname") or entry.get("metricName") or entry.get("metric_name")
+        if not app_hint or not metric_hint:
+            continue
+
+        app_name = str(app_hint).strip()
+        metric_name = str(metric_hint).strip()
+        if not app_name or not metric_name:
+            continue
+
+        if _is_excluded_app(app_name):
+            continue
+
+        metrics_by_app.setdefault(app_name, set()).add(metric_name)
+        lookup.setdefault(_normalize_app_key(app_name), app_name)
+
+    catalog = {app: sorted(values) for app, values in metrics_by_app.items()}
+
+    # Ensure canonical entries exist even when AMS metadata is sparse.
+    for canonical in APP_SYNONYMS.keys():
+        if _is_excluded_app(canonical):
+            continue
+        lower = _normalize_app_key(canonical)
+        lookup.setdefault(lower, canonical)
+        catalog.setdefault(canonical, [])
+
+    for excluded in list(catalog.keys()):
+        if _is_excluded_app(excluded):
+            catalog.pop(excluded, None)
+            lookup.pop(_normalize_app_key(excluded), None)
+
+    _DYNAMIC_CATALOG_CACHE = {
+        "timestamp": now,
+        "catalog": catalog,
+        "lookup": lookup,
+    }
+
+    return catalog, lookup
+
+
+def canonicalize_app_id(app_id: Optional[str], lookup: Optional[Dict[str, str]] = None) -> Optional[str]:
+    """Resolve user-provided appId into an AMS-recognised identifier."""
+
+    if not app_id or not isinstance(app_id, str):
+        return None
+
+    normalized = app_id.strip()
+    if not normalized:
+        return None
+
+    lowered = normalized.lower()
+
+    if lookup and lowered in lookup:
+        candidate = lookup[lowered]
+        if _is_excluded_app(candidate):
+            return None
+        return candidate
+
+    for canonical, synonyms in APP_SYNONYMS.items():
+        candidates = {canonical.lower(), *(syn.lower() for syn in synonyms)}
+        if lowered in candidates:
+            if lookup and canonical.lower() in lookup:
+                resolved = lookup[canonical.lower()]
+                if _is_excluded_app(resolved):
+                    return None
+                return resolved
+            if _is_excluded_app(canonical):
+                return None
+            return canonical
+
+    if _is_excluded_app(normalized):
+        return None
+
+    return normalized
+
+
+async def get_metric_catalog(use_cache: bool = True) -> Dict[str, List[str]]:
+    catalog, _ = await ensure_metric_catalog(use_cache=use_cache)
+    return catalog
+
+
+async def get_available_app_ids(use_cache: bool = True) -> List[str]:
+    catalog, _ = await ensure_metric_catalog(use_cache=use_cache)
+    return sorted(catalog.keys())
+
+
+async def get_metrics_for_app(app_id: Optional[str], use_cache: bool = True) -> List[str]:
+    catalog, lookup = await ensure_metric_catalog(use_cache=use_cache)
+    if not app_id:
+        return []
+
+    resolved = canonicalize_app_id(app_id, lookup)
+    if not resolved:
+        return []
+
+    # Prefer resolved key from lookup when available.
+    lower = resolved.lower()
+    if lookup and lower in lookup:
+        resolved = lookup[lower]
+
+    return catalog.get(resolved, [])
+
+
+async def metric_supported_for_app(app_id: Optional[str], metric_name: Optional[str], use_cache: bool = True) -> bool:
+    if not metric_name:
+        return False
+    metrics = await get_metrics_for_app(app_id, use_cache=use_cache)
+    return metric_name in metrics
 
 
 async def collect_metadata_entries(
@@ -523,28 +756,49 @@ async def collect_metadata_entries(
             normalized = app.strip()
             if not normalized or normalized.lower() in candidate_seen:
                 continue
+            if _is_excluded_app(normalized):
+                continue
             candidate_seen.add(normalized.lower())
             candidate_app_ids.append(normalized)
     elif prefer_app:
         normalized = prefer_app.strip()
         if normalized and normalized.lower() not in candidate_seen:
             candidate_seen.add(normalized.lower())
-            candidate_app_ids.append(normalized)
+            if not _is_excluded_app(normalized):
+                candidate_app_ids.append(normalized)
 
-    for curated_app in CURATED_METRIC_APP_IDS:
-        if curated_app.lower() in candidate_seen:
-            continue
-        candidate_seen.add(curated_app.lower())
-        candidate_app_ids.append(curated_app)
+    if not candidate_app_ids:
+        catalog, _ = await ensure_metric_catalog(use_cache=use_cache)
+        for app_name in catalog.keys():
+            lowered = app_name.lower()
+            if lowered in candidate_seen:
+                continue
+            if _is_excluded_app(app_name):
+                continue
+            candidate_seen.add(lowered)
+            candidate_app_ids.append(app_name)
+
+    if not candidate_app_ids:
+        for curated_app in CURATED_METRIC_APP_IDS:
+            if curated_app.lower() in candidate_seen:
+                continue
+            if _is_excluded_app(curated_app):
+                continue
+            candidate_seen.add(curated_app.lower())
+            candidate_app_ids.append(curated_app)
 
     for candidate in candidate_app_ids:
         normalized = candidate.strip() if isinstance(candidate, str) else ""
         if not normalized:
             continue
+        if _is_excluded_app(normalized):
+            continue
         metadata = await get_metrics_metadata(normalized, use_cache=use_cache)
         for entry in metadata:
             metric_name = str(entry.get("metricname") or entry.get("metricName") or entry.get("name") or "")
             app_name = str(entry.get("appid") or entry.get("appId") or entry.get("application") or "")
+            if _is_excluded_app(app_name):
+                continue
             cache_key = (metric_name.lower(), app_name.lower())
             if cache_key in seen_keys:
                 continue
@@ -701,7 +955,8 @@ async def fetch_metric_series(
     now_ms = int(datetime.datetime.now(datetime.timezone.utc).timestamp() * 1000)
     start_ms = max(0, now_ms - duration_ms)
 
-    canonical_app = metrics_catalog.canonicalize_app_id(app_id)
+    _, lookup = await ensure_metric_catalog()
+    canonical_app = canonicalize_app_id(app_id, lookup)
 
     params: Dict[str, Any] = {
         "metricNames": metric_name,
