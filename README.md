@@ -571,6 +571,151 @@ This MCP server provides the following tools for Ambari cluster management:
 
 ---
 
+## 🛠️ Adding Custom Tools
+
+After you've thoroughly explored the existing functionality, you might want to add your own custom tools for specific monitoring or management needs. This MCP server is designed for easy extensibility.
+
+### Step-by-Step Guide
+
+#### 1. **Add Helper Functions (Optional)**
+
+Add reusable data functions to `src/mcp_ambari_api/functions.py`:
+
+```python
+async def get_your_custom_data(target_resource: str = None) -> List[Dict[str, Any]]:
+    """Your custom data retrieval function."""
+    # Example implementation - adapt to your Ambari service
+    endpoint = f"/clusters/{AMBARI_CLUSTER_NAME}/your_custom_endpoint"
+    if target_resource:
+        endpoint += f"/{target_resource}"
+    
+    response_data = await make_ambari_request(endpoint)
+    
+    if response_data is None or "items" not in response_data:
+        return []
+    
+    return response_data["items"]
+```
+
+#### 2. **Create Your MCP Tool**
+
+Add your tool function to `src/mcp_ambari_api/mcp_main.py`:
+
+```python
+@mcp.tool()
+@log_tool
+async def get_your_custom_analysis(limit: int = 50, target_name: Optional[str] = None) -> str:
+    """
+    [Tool Purpose]: Brief description of what your tool does
+    
+    [Core Functions]:
+    - Feature 1: Data aggregation and analysis
+    - Feature 2: Resource monitoring and insights
+    - Feature 3: Performance metrics and reporting
+    
+    [Required Usage Scenarios]:
+    - When user asks "your specific analysis request"
+    - Your business-specific monitoring needs
+    
+    Args:
+        limit: Maximum results (1-100)
+        target_name: Target resource/service name (optional)
+    
+    Returns:
+        Formatted analysis results (success: formatted data, failure: English error message)
+    """
+    try:
+        limit = max(1, min(limit, 100))  # Always validate input
+        
+        results = await get_your_custom_data(target_resource=target_name)
+        
+        if not results:
+            return f"No custom analysis data found{' for ' + target_name if target_name else ''}."
+        
+        # Apply limit
+        limited_results = results[:limit]
+        
+        # Format output
+        result_lines = [
+            f"Custom Analysis Results{' for ' + target_name if target_name else ''}",
+            "=" * 50,
+            f"Found: {len(limited_results)} items (total: {len(results)})",
+            ""
+        ]
+        
+        for i, item in enumerate(limited_results, 1):
+            # Customize this formatting based on your data structure
+            name = item.get("name", "Unknown")
+            status = item.get("status", "N/A")
+            result_lines.append(f"[{i}] {name}: {status}")
+        
+        return "\n".join(result_lines)
+        
+    except Exception as e:
+        return f"Error: Exception occurred while retrieving custom analysis - {str(e)}"
+```
+
+#### 3. **Update Imports**
+
+Add your helper function to the imports section in `src/mcp_ambari_api/mcp_main.py`:
+
+```python
+from mcp_ambari_api.functions import (
+    format_timestamp,
+    format_single_host_details,
+    make_ambari_request,
+    # ... existing imports ...
+    get_your_custom_data,  # Add your new function here
+)
+```
+
+#### 4. **Update Prompt Template (Recommended)**
+
+Add your tool description to `src/mcp_ambari_api/prompt_template.md` for better AI recognition:
+
+```markdown
+### Custom Analysis Tools
+
+**get_your_custom_analysis**
+- "Show me custom analysis results"
+- "Get custom analysis for target_name"
+- "Display custom monitoring data"
+- 📋 **Features**: Custom data aggregation, resource monitoring, performance insights
+```
+
+#### 5. **Test Your Tool**
+
+```bash
+# Local testing with MCP Inspector
+./run-mcp-inspector-local.sh
+
+# Or test with Docker environment
+docker-compose up -d
+docker-compose logs -f mcp-server
+
+# Test with natural language queries:
+# "Show me custom analysis results"
+# "Get custom analysis for my_target"
+```
+
+### Important Notes
+
+- **Always use `@mcp.tool()` and `@log_tool` decorators** for proper registration and logging
+- **Follow the existing error handling patterns** - return English error messages starting with "Error:"
+- **Use `make_ambari_request()` function** for all Ambari API calls to ensure consistent authentication and error handling
+- **Validate all input parameters** before using them in API calls
+- **Test thoroughly** with both valid and invalid inputs
+
+### Example Use Cases
+
+- **Custom service health checks** beyond standard Ambari monitoring
+- **Specialized configuration validation** for your organization's standards  
+- **Custom alert aggregation** and reporting formats
+- **Integration with external monitoring systems** via Ambari data
+- **Automated compliance checking** for cluster configurations
+
+---
+
 ## ❓ Frequently Asked Questions
 
 ### Q: What Ambari versions are supported?
@@ -599,12 +744,12 @@ We're always excited to welcome new contributors! Whether you're fixing a typo, 
 
 **Ways to contribute:**
 - 🐛 Report issues or bugs
-- 💡 Suggest new PostgreSQL monitoring features
+- 💡 Suggest new Ambari monitoring features
 - 📝 Improve documentation 
 - 🚀 Submit pull requests
 - ⭐ Star the repo if you find it useful!
 
-**Pro tip:** The codebase is designed to be super friendly for adding new tools. Check out the existing `@mcp.tool()` functions in `mcp_main.py`.
+**Pro tip:** The codebase is designed to be super friendly for adding new tools. Check out the existing `@mcp.tool()` functions in `mcp_main.py` and follow the [Adding Custom Tools](#️-adding-custom-tools) guide above.
 
 ---
 
