@@ -4,6 +4,7 @@ MCP tool definitions for Ambari REST API operations.
 - Ambari API Documents: https://github.com/apache/ambari/blob/trunk/ambari-server/docs/api/v1/index.md
 """
 from typing import Dict, Optional, List, Any, Set
+from urllib.parse import parse_qs
 import argparse
 from fastmcp import FastMCP
 from fastmcp.server.auth import StaticTokenVerifier
@@ -2490,7 +2491,7 @@ async def list_common_metrics_catalog(
     return "\n".join(lines)
 
 
-@mcp.resource("ambari-metrics://catalog/{selector}{?refresh}")
+@mcp.resource("ambari-metrics://catalog/{selector}")
 async def ambari_metrics_catalog_resource(
     selector: str = "all",
     refresh: Optional[str] = None,
@@ -2504,6 +2505,15 @@ async def ambari_metrics_catalog_resource(
     - `app/<appId>`: same as above, explicit prefix for clarity.
     """
 
+    selector_input = (selector or "all").strip()
+
+    # Accept refresh overrides via query string parameters, e.g. catalog/all?refresh=true
+    if "?" in selector_input:
+        selector_input, query_str = selector_input.split("?", 1)
+        params = parse_qs(query_str, keep_blank_values=True)
+        if refresh is None and "refresh" in params and params["refresh"]:
+            refresh = params["refresh"][0]
+
     refresh_requested = False
     if isinstance(refresh, str):
         refresh_requested = refresh.strip().lower() in {"1", "true", "yes", "refresh", "force"}
@@ -2511,7 +2521,7 @@ async def ambari_metrics_catalog_resource(
     use_cache = not refresh_requested
     catalog, lookup = await ensure_metric_catalog(use_cache=use_cache)
 
-    selector_normalized = (selector or "all").strip()
+    selector_normalized = selector_input
     selector_lower = selector_normalized.lower()
 
     async def metrics_for(app_identifier: str) -> Dict[str, List[str]]:
