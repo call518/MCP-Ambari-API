@@ -139,10 +139,19 @@ Below is an example screenshot showing how to query the Ambari cluster using MCP
 
 ## 📈 Metrics & Trends
 
-- `list_common_metrics_catalog`: keyword search against the live metadata-backed metric catalog (cached locally). Use `search="heap"` or similar to narrow suggestions before running a time-series query.
-- `list_ambari_metric_apps`: list discovered AMS `appId` values, optionally including metric counts; pass `refresh=true` or `limit` to control output.
-- `query_ambari_metrics`: fetch time-series data; the tool auto-selects curated metric names, falls back to metadata search when needed, and honors Ambari's default precision unless you explicitly supply `precision="SECONDS"`, etc.
-- `list_ambari_metrics_metadata`: raw AMS metadata explorer for ad-hoc discovery (supports `app_id`, `metric_name_filter`, `host_filter`, `search` and adjustable `limit`, default 50).
+- **Terminology quick reference**
+  - **appId**: Ambari Metrics Service groups every metric under an application identifier (e.g., `namenode`, `datanode`, `ambari_server`, `HOST`). Think of it as the component or service emitting that timeseries.
+  - **metric name**: The fully qualified string Ambari uses for each timeseries (e.g., `jvm.JvmMetrics.MemHeapUsedM`, `dfs.datanode.BytesWritten`). Exact names are required when querying AMS.
+
+- `list_common_metrics_catalog`: keyword search against the live metadata-backed metric catalog (cached locally). Use `search="heap"` or similar to narrow suggestions before running a time-series query.  
+  _Example_: “Show the heap-related metrics available for the NameNode appId.”
+- `list_ambari_metric_apps`: list discovered AMS `appId` values, optionally including metric counts; pass `refresh=true` or `limit` to control output.  
+  _Example_: “List every appId currently exposed by AMS.”
+- The natural-language query “AMS에서 사용 가능한 appId 목록만 보여줘” maps to `list_ambari_metric_apps` and returns the exact identifiers you can copy into other tools.
+- `list_ambari_metrics_metadata`: raw AMS metadata explorer (supports `app_id`, `metric_name_filter`, `host_filter`, `search`, adjustable `limit`, default 50).  
+  _Example_: “Give me CPU-related metric metadata under HOST.”
+- `query_ambari_metrics`: fetch time-series data; the tool auto-selects curated metric names, falls back to metadata search when needed, and honors Ambari's default precision unless you explicitly supply `precision="SECONDS"`, etc.  
+  _Examples_: “Plot the last 30 minutes of `jvm.JvmMetrics.MemHeapUsedM` for the NameNode.” / “Compare `jvm.JvmMetrics.MemHeapUsedM` for DataNode hosts `bigtop-hostname0.demo.local` and `bigtop-hostname1.demo.local` over the past 30 minutes.”
 - `hdfs_dfadmin_report`: produce a DFSAdmin-style capacity/DataNode summary (mirrors `hdfs dfsadmin -report`).
 
 **Live Metric Catalog (via AMS metadata)**

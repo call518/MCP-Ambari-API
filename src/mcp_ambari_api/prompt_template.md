@@ -359,10 +359,10 @@ Any suggestion to check elsewhere manually instead of using the API tools.
 - 💡 **Tip**: use `search="heap"`, `"gc"`, etc. to narrow the catalog, then copy the exact metric names for `query_ambari_metrics`.
 
 **query_ambari_metrics**
-- "query_ambari_metrics(metric_names=\"jvm.JvmMetrics.MemHeapUsedM\", app_id=\"namenode\", duration=\"1h\")"
-- "query_ambari_metrics(metric_names=\"dfs.FSNamesystem.SafeModeTime\", app_id=\"namenode\", duration=\"6h\")"
-- "query_ambari_metrics(metric_names=\"dfs.datanode.BytesWritten\", app_id=\"datanode\", duration=\"30m\", group_by_host=true)"
-- "query_ambari_metrics(metric_names=\"yarn.QueueMetrics.Queue=root.PendingMB\", app_id=\"resourcemanager\", duration=\"24h\")"
+- "Show the last hour of NameNode heap usage." → `query_ambari_metrics(metric_names="jvm.JvmMetrics.MemHeapUsedM", app_id="namenode", duration="1h")`
+- "Trend SafeMode time for the past 6 hours." → `query_ambari_metrics(metric_names="dfs.FSNamesystem.SafeModeTime", app_id="namenode", duration="6h")`
+- "Compare DataNode heap usage on bigtop-hostname0.demo.local and bigtop-hostname1.demo.local over 30 minutes." → `query_ambari_metrics(metric_names="jvm.JvmMetrics.MemHeapUsedM", app_id="datanode", duration="30m", hostnames="bigtop-hostname0.demo.local,bigtop-hostname1.demo.local", group_by_host=true)`
+- "Show pending YARN memory for the last day." → `query_ambari_metrics(metric_names="yarn.QueueMetrics.Queue=root.PendingMB", app_id="resourcemanager", duration="24h")`
 - 💡 **Tip**: Hostnames are optional—omit them for cluster-wide stats or specify explicit hosts to focus on particular nodes. If Ambari returns no datapoints, re-check the identifiers via `/ws/v1/timeline/metrics/metadata`.
 
 **hdfs_dfadmin_report**
