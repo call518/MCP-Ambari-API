@@ -29,15 +29,20 @@
 
 ---
 
-### 🎯 What You Can Do
+### Features
 
-- **Automated Service Management**: Start, stop, restart Hadoop services (HDFS, YARN, Spark, etc.) with simple commands
-- **Real-time Monitoring**: Monitor cluster health, service status, and performance metrics
-- **Metrics Analytics**: Query Ambari Metrics (AMS) for live time-series data, trend deltas, and capacity insights using exact metric identifiers
-- **Configuration Management**: View, update, and manage cluster configurations across all services  
-- **Alert Management**: Track and manage cluster alerts and notifications
-- **User & Host Management**: Manage cluster users, permissions, and host assignments
-- **Request Tracking**: Monitor long-running operations with detailed progress tracking
+- **Interactive Ambari Operations Hub** – Provides an MCP-based foundation for querying and managing services through natural language instead of console or UI interfaces.
+- **Real-time Cluster Visibility** – Comprehensive view of key metrics including service status, host details, alert history, and ongoing requests in a single interface.
+- **Metrics Intelligence Pipeline** – Dynamically discovers and filters AMS appIds and metric names, connecting directly to time-series analysis workflows.
+- **Automated Operations Workflow** – Consolidates repetitive start/stop operations, configuration checks, user queries, and request tracking into consistent scenarios.
+- **Built-in Operational Reports** – Instantly delivers dfsadmin-style HDFS reports, service summaries, and capacity metrics through LLM or CLI interfaces.
+- **Safety Guards and Guardrails** – Requires user confirmation before large-scale operations and provides clear guidance for risky commands through prompt templates.
+- **LLM Integration Optimization** – Includes natural language examples, parameter mapping, and usage guides to ensure stable AI agent operations.
+- **Flexible Deployment Models** – Supports stdio/streamable-http transport, Docker Compose, and token authentication for deployment across development and production environments.
+- **Performance-Oriented Caching Architecture** – Built-in AMS metadata cache and request logging ensure fast responses even in large-scale clusters.
+- **Scalable Code Architecture** – Asynchronous HTTP, structured logging, and modularized tool layers enable easy addition of new features.
+- **Production-Validated** – Based on tools validated in test Ambari clusters, ready for immediate use in production environments.
+- **Diversified Deployment Channels** – Available through PyPI packages, Docker images, and other preferred deployment methods.
 
 ### Docuement for Airflow REST-API
 
