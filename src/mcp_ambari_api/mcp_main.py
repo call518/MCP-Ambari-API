@@ -2711,8 +2711,9 @@ async def hdfs_dfadmin_report(
             ip_addr = host_info.get("ip")
             ams_host_filter = public_name or host_name or ip_addr
 
+            # Try to get detailed host info without metrics fields (which cause HTTP 400)
             detail_resp = await make_ambari_request(
-                f"/clusters/{target_cluster}/hosts/{host_name}?fields=Hosts/ip,Hosts/public_host_name,Hosts/last_heartbeat_time,metrics/cpu,metrics/memory,metrics/dfs,metrics/disk,metrics/network",
+                f"/clusters/{target_cluster}/hosts/{host_name}?fields=Hosts/ip,Hosts/public_host_name,Hosts/last_heartbeat_time",
                 method="GET",
             )
 
@@ -3019,7 +3020,7 @@ async def query_ambari_metrics(
     if group_by_host:
         base_params["grouped"] = "true"
 
-    def extract_metric_entries(response_obj) -> (List[Dict], Optional[str]):
+    def extract_metric_entries(response_obj) -> tuple[List[Dict], Optional[str]]:
         """Extract metric entry list and optional error message from AMS response."""
         if response_obj is None:
             return [], "No response"
