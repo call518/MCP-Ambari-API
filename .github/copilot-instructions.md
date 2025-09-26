@@ -1,5 +1,10 @@
 # Copilot Instructions for MCP-Ambari-API
 
+## Language Guidelines
+- **Code & Development**: Use English as the default language for all code, comments, documentation, and technical implementations unless explicitly requested otherwise by the user
+- **User Communication**: Use Korean as the default language for conversations and interactions with users through Copilot chat interface
+- **Documentation**: Technical documentation should be in English, while user-facing help and explanations should be in Korean
+
 ## Architecture & Transport Selection
 This MCP server supports dual transport modes with flexible configuration via CLI args and environment variables:
 - **stdio mode**: Default for local usage (`uvx mcp-ambari-api`)
