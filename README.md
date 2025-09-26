@@ -56,7 +56,11 @@
 
 ### [Go to More Example Queries](./src/mcp_ambari_api/prompt_template.md#9-example-queries)
 
+---
+
 ![Example: Querying Ambari Cluster(1)](img/ex-screenshot-1.png)
+
+---
 
 ![Example: Querying Ambari Cluster(2)](img/ex-screenshot-hdfs-dfsadmin-report.png)
 

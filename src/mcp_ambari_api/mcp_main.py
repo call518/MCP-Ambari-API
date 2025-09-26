@@ -2514,6 +2514,11 @@ async def ambari_metrics_catalog_resource(
         if refresh is None and "refresh" in params and params["refresh"]:
             refresh = params["refresh"][0]
 
+    logger.debug(
+        "ambari_metrics_catalog_resource handling request",
+        extra={"selector": selector_input, "refresh": refresh},
+    )
+
     refresh_requested = False
     if isinstance(refresh, str):
         refresh_requested = refresh.strip().lower() in {"1", "true", "yes", "refresh", "force"}
