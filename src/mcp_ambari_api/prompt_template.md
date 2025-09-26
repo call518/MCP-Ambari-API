@@ -1,7 +1,13 @@
 # MCP Ambari API Prompt Template (English - Default)
 
-## 0. Mandatory Guidelines
-- Always use the provided API tools for real data retrieval; never guess or reference external interfaces.
+## 0. Mandatory Guid4. Mentions config / property / setting → dump_configurations.
+   - Single known type: dump_configurations(config_type="<type>")
+   - Explore broadly: dump_configurations(summarize=True)
+   - Narrow by substring: dump_configurations(filter="prop_or_type_fragment")
+   - Bulk but restrict to related types (e.g. yarn): dump_configurations(service_filter="yarn", summarize=True)
+5. If user requests **host information list** → `get_host_details(hostname)` (call without arguments if full list is needed).  
+   - For metric viewing requests from any app, follow the `query_ambari_metrics` flow without hostname. hostname is always optional.
+6. Mentions active / running operations → get_active_requests. Always use the provided API tools for real data retrieval; never guess or reference external interfaces.
 - No hypothetical responses or manual check suggestions; leverage the tools for every query.
 - Operate in read-only mode for this release; avoid mutating operations (start/stop/restart/config updates) until enabled.
 - Validate and normalize all input parameters (timestamps, limits) before use.
@@ -103,13 +109,13 @@ Every tool call triggers a real Ambari REST API request. Call tools ONLY when ne
 - Tool executes query with LLM-calculated timestamps
 
 **SUPPORTED TIME EXPRESSIONS** (unlimited):
-- "어제", "yesterday" 
-- "지난주", "last week"
-- "작년", "last year"  
-- "10년 전", "10 years ago"
-- "지난달 첫째 주", "first week of last month"
-- "2020년 여름", "summer 2020"
-- "최근 6개월", "past 6 months"
+- "yesterday", "어제"
+- "last week", "지난주"
+- "last year", "작년"  
+- "10 years ago", "10년 전"
+- "first week of last month", "지난달 첫째 주"
+- "summer 2020", "2020년 여름"
+- "past 6 months", "최근 6개월"
 - **ANY natural language time expression**
 
 **Example for "How many HDFS alerts occurred last week":**
@@ -145,7 +151,7 @@ Any suggestion to check elsewhere manually instead of using the API tools.
 
 **STEP 4**: Provide the actual results from the API response, not hypothetical answers.
 
-**Example for "지난 주에 HDFS 관련 알림이 몇 번 발생했는지" (last week HDFS alerts):**
+**Example for "How many HDFS-related alerts occurred last week":**
 1. Call `get_alerts_history(mode="history", service_name="HDFS", include_time_context=true, format="summary")` → Returns current time and calculated ranges
 2. Extract last week range from the time context provided
 3. **MUST CALL**: `get_alerts_history(mode="history", service_name="HDFS", from_timestamp=<calculated>, to_timestamp=<calculated>, format="summary")`
@@ -207,15 +213,15 @@ Any suggestion to check elsewhere manually instead of using the API tools.
    1. `get_alerts_history(mode="history", state_filter="CRITICAL", include_time_context=true)`
    2. LLM calculates "yesterday" timestamps and makes second call
 
-### M. User: "작년 여름에 발생한 YARN 알림들"
+### M. User: "YARN alerts that occurred last summer"
 → **UNIVERSAL**: 
    1. `get_alerts_history(mode="history", service_name="YARN", include_time_context=true)`
-   2. LLM calculates "작년 여름" (summer of previous year) timestamps and makes second call
+   2. LLM calculates "last summer" (summer of previous year) timestamps and makes second call
 
-### N. User: "10년 전 이맘때쯤 어떤 알림들이 있었나?"
+### N. User: "What alerts were there around this time 10 years ago?"
 → **UNIVERSAL**: 
    1. `get_alerts_history(mode="history", include_time_context=true)`
-   2. LLM calculates "10년 전 이맘때" (around this time 10 years ago) and makes second call
+   2. LLM calculates "around this time 10 years ago" and makes second call
 
 ### O. User: "Show NodeManager JVM heap usage by host for the past hour"
 → 1. `list_common_metrics_catalog(app_id="nodemanager", search="heap")` → copy `jvm.JvmMetrics.MemHeapUsedM`
@@ -227,13 +233,13 @@ Any suggestion to check elsewhere manually instead of using the API tools.
 ### Q. User: "Plot DataNode bytes written trend over last 30 minutes"
 → Call: `query_ambari_metrics(metric_names="dfs.datanode.BytesWritten", app_id="datanode", duration="30m", group_by_host=true)` (host filter auto-applied if omitted)
 
-### R. User: "datanode들에서 dfs.datanode.capacity.total 메트릭값 조회해줘"
+### R. User: "Please query dfs.datanode.capacity.total metric values from DataNodes"
 → Call: `query_ambari_metrics(metric_names="dfs.datanode.capacity.total", app_id="datanode", duration="1h")`
 
-### S. User: "NodeManager JVM heap 사용량 좀 보여줘"
+### S. User: "Show me NodeManager JVM heap usage"
 → Call: `query_ambari_metrics(metric_names="jvm.JvmMetrics.MemHeapUsedM", app_id="nodemanager", duration="1h")`
 
-### T. User: "ResourceManager pending MB 추이를 봐줘"
+### T. User: "Show me ResourceManager pending MB trends"
 → Call: `query_ambari_metrics(metric_names="yarn.QueueMetrics.Queue=root.PendingMB", app_id="resourcemanager", duration="6h")`
 
 ---
