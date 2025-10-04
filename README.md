@@ -119,7 +119,7 @@ Start the `MCP-Server`, `MCPO`(MCP-Proxy for OpenAPI), and `OpenWebUI`.
 
 - OpenWebUI will be available at: `http://localhost:${DOCKER_EXTERNAL_PORT_OPENWEBUI}` (default: 3001)
 - The MCPO-Proxy will be accessible at: `http://localhost:${DOCKER_EXTERNAL_PORT_MCPO_PROXY}` (default: 8001)  
-- The MCPO API Docs: `http://localhost:${DOCKER_EXTERNAL_PORT_MCPO_PROXY}/ambari-api/docs`
+- The MCPO API Docs: `http://localhost:${DOCKER_EXTERNAL_PORT_MCPO_PROXY}/mcp-ambari-api/docs`
 
 ![Example: MCPO-Proxy](img/mcpo-proxy-api-docs.png)
 
@@ -127,7 +127,7 @@ Start the `MCP-Server`, `MCPO`(MCP-Proxy for OpenAPI), and `OpenWebUI`.
 
 1. logging in to OpenWebUI with an admin account
 1. go to "Settings" → "Tools" from the top menu.
-1. Enter the `ambari-api` Tool address (e.g., `http://localhost:8000/ambari-api`) to connect MCP Tools with your Ambari cluster.
+1. Enter the `mcp-ambari-api` Tool address (e.g., `http://localhost:8000/mcp-ambari-api`) to connect MCP Tools with your Ambari cluster.
 
 ### 4. More Examples: Using MCP Tools to Query Ambari Cluster
 
@@ -296,7 +296,7 @@ When authentication is enabled, MCP clients must include the Bearer token in the
 ```json
 {
   "mcpServers": {
-    "ambari-api": {
+    "mcp-ambari-api": {
       "type": "streamable-http",
       "url": "http://your-server:8000/mcp",
       "headers": {
@@ -329,7 +329,7 @@ When authentication fails, the server returns:
 ```json
 {
   "mcpServers": {
-    "ambari-api": {
+    "mcp-ambari-api": {
       "command": "uvx",
       "args": ["--python", "3.12", "mcp-ambari-api"],
       "env": {
@@ -352,7 +352,7 @@ When authentication fails, the server returns:
 ```json
 {
   "mcpServers": {
-    "ambari-api": {
+    "mcp-ambari-api": {
       "type": "streamable-http",
       "url": "http://localhost:18001/mcp"
     }
@@ -365,7 +365,7 @@ When authentication fails, the server returns:
 ```json
 {
   "mcpServers": {
-    "ambari-api": {
+    "mcp-ambari-api": {
       "type": "streamable-http", 
       "url": "http://localhost:18001/mcp",
       "headers": {
@@ -385,7 +385,7 @@ When authentication fails, the server returns:
 ```json
 {
   "mcpServers": {
-    "ambari-api": {
+    "mcp-ambari-api": {
       "command": "uvx",
       "args": ["--python", "3.12", "mcp-ambari-api"],
       "env": {
@@ -441,7 +441,7 @@ When authentication fails, the server returns:
 ```json
 {
   "mcpServers": {
-    "ambari-api-remote": {
+    "mcp-ambari-api-remote": {
       "type": "streamable-http",
       "url": "http://your-server-ip:18001/mcp",
       "headers": {

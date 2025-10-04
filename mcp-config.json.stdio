@@ -1,6 +1,6 @@
 {
   "mcpServers": {
-    "ambari-api": {
+    "mcp-ambari-api": {
       "command": "python",
       "args": ["-m", "mcp_ambari_api"],
       "env": {

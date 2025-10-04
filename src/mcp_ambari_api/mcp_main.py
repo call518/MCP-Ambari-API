@@ -74,11 +74,11 @@ if _auth_enable and _secret_key:
     }
     
     auth = StaticTokenVerifier(tokens=tokens)
-    mcp = FastMCP("ambari-api", auth=auth)
+    mcp = FastMCP("mcp-ambari-api", auth=auth)
     logger.info("MCP instance initialized with authentication")
 else:
     logger.info("Initializing MCP instance without authentication")
-    mcp = FastMCP("ambari-api")
+    mcp = FastMCP("mcp-ambari-api")
 
 # =============================================================================
 # Constants
