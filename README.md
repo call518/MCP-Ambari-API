@@ -125,6 +125,8 @@ Start the `MCP-Server`, `MCPO`(MCP-Proxy for OpenAPI), and `OpenWebUI`.
 
 ### 3. Registering the Tool in OpenWebUI
 
+> 📌 **Note**: Web-UI configuration instructions are based on OpenWebUI **v0.6.22**. Menu locations and settings may differ in newer versions.
+
 1. logging in to OpenWebUI with an admin account
 1. go to "Settings" → "Tools" from the top menu.
 1. Enter the `mcp-ambari-api` Tool address (e.g., `http://localhost:8000/mcp-ambari-api`) to connect MCP Tools with your Ambari cluster.
