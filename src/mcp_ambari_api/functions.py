@@ -201,7 +201,8 @@ async def make_ambari_request(endpoint: str, method: str = "GET", data: Optional
         
         headers = {
             'Authorization': f'Basic {auth_b64}',
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'X-Requested-By': 'ambari'
         }
         
         url = f"{AMBARI_API_BASE_URL}{endpoint}"
