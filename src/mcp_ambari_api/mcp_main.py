@@ -2657,6 +2657,36 @@ async def hdfs_dfadmin_report(
         value = await fetch_latest_metric_value(metric, app_id="namenode", duration_ms=lookback_ms)
         cluster_values[key] = value
 
+    # Fallback: fetch cluster-level metrics via Ambari REST API (NameNode component)
+    # when AMS does not return capacity data.
+    if cluster_values.get("configured_capacity") is None:
+        nn_resp = await make_ambari_request(
+            f"/clusters/{target_cluster}/services/HDFS/components/NAMENODE"
+            "?fields=metrics/dfs/FSNamesystem",
+            method="GET",
+        )
+        if nn_resp and not nn_resp.get("error"):
+            fs_ns = (nn_resp.get("metrics") or {}).get("dfs", {}).get("FSNamesystem", {})
+            rest_mapping = {
+                "configured_capacity": "CapacityTotal",
+                "dfs_used": "CapacityUsed",
+                "dfs_remaining": "CapacityRemaining",
+                "non_dfs_used": "CapacityUsedNonDFS",
+                "under_replicated": "UnderReplicatedBlocks",
+                "corrupt_replicas": "CorruptBlocks",
+                "missing_blocks": "MissingBlocks",
+                "missing_blocks_repl_one": "MissingReplOneBlocks",
+                "lowest_priority_redundancy": "LowRedundancyBlocks",
+                "pending_deletion": "PendingDeletionBlocks",
+                "ec_low_redundancy": "LowRedundancyECBlockGroups",
+                "ec_corrupt": "CorruptECBlockGroups",
+                "ec_missing": "MissingECBlockGroups",
+                "ec_pending_deletion": "PendingDeletionECBlocks",
+            }
+            for key, field in rest_mapping.items():
+                if cluster_values.get(key) is None and field in fs_ns:
+                    cluster_values[key] = to_float(fs_ns[field])
+
     configured = to_float(cluster_values.get("configured_capacity"))
     dfs_used = to_float(cluster_values.get("dfs_used")) or 0.0
     dfs_remaining = to_float(cluster_values.get("dfs_remaining")) or 0.0
@@ -2711,22 +2741,39 @@ async def hdfs_dfadmin_report(
             ip_addr = host_info.get("ip")
             ams_host_filter = public_name or host_name or ip_addr
 
-            # Try to get detailed host info without metrics fields (which cause HTTP 400)
-            detail_resp = await make_ambari_request(
-                f"/clusters/{target_cluster}/hosts/{host_name}?fields=Hosts/ip,Hosts/public_host_name,Hosts/last_heartbeat_time",
+            # Try to get DataNode metrics via host_components endpoint (Ambari REST API).
+            dn_comp_resp = await make_ambari_request(
+                f"/clusters/{target_cluster}/hosts/{host_name}/host_components/DATANODE"
+                "?fields=metrics/dfs/datanode",
                 method="GET",
             )
 
-            if not detail_resp or detail_resp.get("error"):
-                detail_resp = host_item
+            dfs_metrics: Dict[str, Any] = {}
+            if dn_comp_resp and not dn_comp_resp.get("error"):
+                dfs_metrics = (
+                    (dn_comp_resp.get("metrics") or {}).get("dfs", {}).get("datanode", {})
+                )
 
-            host_metrics = detail_resp.get("metrics", {}) if detail_resp else {}
-            dfs_metrics = host_metrics.get("dfs", {}) if isinstance(host_metrics, dict) else {}
-
-            capacity_total = to_float(dfs_metrics.get("FSCapacityTotalBytes") or dfs_metrics.get("FSCapacityTotal"))
-            dfs_used_host = to_float(dfs_metrics.get("FSUsedBytes") or dfs_metrics.get("FSUsed"))
-            dfs_remaining_host = to_float(dfs_metrics.get("FSRemainingBytes") or dfs_metrics.get("FSRemaining"))
-            non_dfs_used = to_float(dfs_metrics.get("NonDFSUsedBytes") or dfs_metrics.get("NonDFSUsed"))
+            capacity_total = to_float(
+                dfs_metrics.get("Capacity")
+                or dfs_metrics.get("FSCapacityTotalBytes")
+                or dfs_metrics.get("FSCapacityTotal")
+            )
+            dfs_used_host = to_float(
+                dfs_metrics.get("DfsUsed")
+                or dfs_metrics.get("FSUsedBytes")
+                or dfs_metrics.get("FSUsed")
+            )
+            dfs_remaining_host = to_float(
+                dfs_metrics.get("Remaining")
+                or dfs_metrics.get("FSRemainingBytes")
+                or dfs_metrics.get("FSRemaining")
+            )
+            non_dfs_used = to_float(
+                dfs_metrics.get("NonDfsUsedSpace")
+                or dfs_metrics.get("NonDFSUsedBytes")
+                or dfs_metrics.get("NonDFSUsed")
+            )
 
             if capacity_total is None:
                 capacity_total = await fetch_latest_metric_value(
@@ -2753,9 +2800,17 @@ async def hdfs_dfadmin_report(
             if non_dfs_used is None and all(v is not None for v in (capacity_total, dfs_used_host, dfs_remaining_host)):
                 non_dfs_used = max(capacity_total - dfs_used_host - dfs_remaining_host, 0)
             if non_dfs_used is None:
-                disk_metrics = host_metrics.get("disk", {}) if isinstance(host_metrics, dict) else {}
-                disk_total = to_float(disk_metrics.get("disk_total"))
-                disk_free = to_float(disk_metrics.get("disk_free"))
+                host_detail_resp = await make_ambari_request(
+                    f"/clusters/{target_cluster}/hosts/{host_name}?fields=metrics/disk",
+                    method="GET",
+                )
+                host_disk_metrics = (
+                    (host_detail_resp.get("metrics") or {}).get("disk", {})
+                    if host_detail_resp and not host_detail_resp.get("error")
+                    else {}
+                )
+                disk_total = to_float(host_disk_metrics.get("disk_total"))
+                disk_free = to_float(host_disk_metrics.get("disk_free"))
                 if disk_total is not None and disk_free is not None and dfs_used_host is not None:
                     non_dfs_used = max(disk_total - disk_free - dfs_used_host, 0)
 

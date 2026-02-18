@@ -27,3 +27,8 @@ include-package-data = true
 # Ensure non-Python resource files ship inside the wheel
 # You can broaden to ["*.md"] if more markdown resources are added later.
 mcp_ambari_api = ["prompt_template.md"]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.15.1",
+]
