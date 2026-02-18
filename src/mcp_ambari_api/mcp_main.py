@@ -2745,38 +2745,48 @@ async def hdfs_dfadmin_report(
             ams_host_filter = public_name or host_name or ip_addr
 
             # Try to get DataNode metrics via host_components endpoint (Ambari REST API).
+            # ?fields=metrics/dfs 로 요청해야 FSDatasetState, FSNamesystem 데이터 수신 가능.
+            # (metrics/dfs/datanode 경로는 실제 데이터를 반환하지 않음)
             dn_comp_resp = await make_ambari_request(
                 f"/clusters/{target_cluster}/hosts/{host_name}/host_components/DATANODE"
-                "?fields=metrics/dfs/datanode",
+                "?fields=metrics/dfs",
                 method="GET",
             )
 
-            dfs_metrics: Dict[str, Any] = {}
-            if dn_comp_resp and not dn_comp_resp.get("error"):
-                dfs_metrics = (
-                    (dn_comp_resp.get("metrics") or {}).get("dfs", {}).get("datanode", {})
-                )
+            capacity_total: Optional[float] = None
+            dfs_used_host: Optional[float] = None
+            dfs_remaining_host: Optional[float] = None
+            non_dfs_used: Optional[float] = None
 
-            capacity_total = to_float(
-                dfs_metrics.get("Capacity")
-                or dfs_metrics.get("FSCapacityTotalBytes")
-                or dfs_metrics.get("FSCapacityTotal")
-            )
-            dfs_used_host = to_float(
-                dfs_metrics.get("DfsUsed")
-                or dfs_metrics.get("FSUsedBytes")
-                or dfs_metrics.get("FSUsed")
-            )
-            dfs_remaining_host = to_float(
-                dfs_metrics.get("Remaining")
-                or dfs_metrics.get("FSRemainingBytes")
-                or dfs_metrics.get("FSRemaining")
-            )
-            non_dfs_used = to_float(
-                dfs_metrics.get("NonDfsUsedSpace")
-                or dfs_metrics.get("NonDFSUsedBytes")
-                or dfs_metrics.get("NonDFSUsed")
-            )
+            if dn_comp_resp and not dn_comp_resp.get("error"):
+                dfs_section = (dn_comp_resp.get("metrics") or {}).get("dfs", {})
+                dfs_state = dfs_section.get("FSDatasetState", {})
+                dfs_namesystem = dfs_section.get("FSNamesystem", {})
+
+                capacity_total = to_float(dfs_state.get("Capacity"))
+                dfs_used_host = to_float(dfs_state.get("DfsUsed"))
+
+                # Remaining: VolumeInfo JSON 문자열에서 각 볼륨의 freeSpace 합산
+                volume_info_raw = dfs_namesystem.get("VolumeInfo")
+                if volume_info_raw:
+                    try:
+                        volume_info = (
+                            json.loads(volume_info_raw)
+                            if isinstance(volume_info_raw, str)
+                            else volume_info_raw
+                        )
+                        dfs_remaining_host = float(
+                            sum(
+                                v.get("freeSpace", 0)
+                                for v in volume_info.values()
+                                if isinstance(v, dict)
+                            )
+                        )
+                    except Exception:
+                        pass
+
+                if all(v is not None for v in (capacity_total, dfs_used_host, dfs_remaining_host)):
+                    non_dfs_used = max(capacity_total - dfs_used_host - dfs_remaining_host, 0)
 
             async def _ams(metric: str) -> Optional[float]:
                 return await fetch_latest_metric_value(
