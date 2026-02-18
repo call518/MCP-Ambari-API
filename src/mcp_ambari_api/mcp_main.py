@@ -607,30 +607,59 @@ async def get_service_components(service_name: str) -> str:
             # Add instance counts if available
             if total_count > 0:
                 result_lines.append(f"   Instances: {started_count} started / {installed_count} installed / {total_count} total")
-            
-            # Add host information
+                if started_count < total_count:
+                    result_lines.append(f"   [WARNING] {total_count - started_count} instance(s) are NOT in STARTED state")
+
+            # Add host information - non-STARTED instances shown in full, STARTED summarized
             if host_components:
+                non_started = [
+                    (hc.get("HostRoles", {}).get("host_name", "Unknown"),
+                     hc.get("HostRoles", {}).get("state", "Unknown"))
+                    for hc in host_components
+                    if hc.get("HostRoles", {}).get("state") != "STARTED"
+                ]
+                started_hosts = [
+                    hc.get("HostRoles", {}).get("host_name", "Unknown")
+                    for hc in host_components
+                    if hc.get("HostRoles", {}).get("state") == "STARTED"
+                ]
+
                 result_lines.append(f"   Hosts ({len(host_components)} instances):")
-                for j, host_comp in enumerate(host_components[:5], 1):  # Show first 5 hosts
-                    host_roles = host_comp.get("HostRoles", {})
-                    host_name = host_roles.get("host_name", "Unknown")
-                    host_state = host_roles.get("state", "Unknown")
-                    result_lines.append(f"      {j}. {host_name} [{host_state}]")
-                
-                if len(host_components) > 5:
-                    result_lines.append(f"      ... and {len(host_components) - 5} more hosts")
+
+                if non_started:
+                    result_lines.append(f"   [WARNING] {len(non_started)} instance(s) not in STARTED state:")
+                    for host_name, host_state in non_started:
+                        result_lines.append(f"      !! {host_name} [{host_state}]")
+
+                if started_hosts:
+                    if len(started_hosts) <= 5:
+                        for host_name in started_hosts:
+                            result_lines.append(f"      - {host_name} [STARTED]")
+                    else:
+                        result_lines.append(f"      - {len(started_hosts)} hosts [STARTED] (omitted for brevity)")
             else:
                 result_lines.append("   Hosts: No host assignments found")
-            
+
             result_lines.append("")
-        
-        # Add summary statistics
-        total_instances = sum(len(comp.get("host_components", [])) for comp in components)
-        started_components = len([comp for comp in components if comp.get("ServiceComponentInfo", {}).get("state") == "STARTED"])
-        
+
+        # Add summary statistics with per-instance state breakdown
+        instance_state_counts: dict = {}
+        for comp in components:
+            for hc in comp.get("host_components", []):
+                state = hc.get("HostRoles", {}).get("state", "Unknown")
+                instance_state_counts[state] = instance_state_counts.get(state, 0) + 1
+
+        total_instances = sum(instance_state_counts.values())
+        non_started_total = total_instances - instance_state_counts.get("STARTED", 0)
+
         result_lines.append("Summary:")
-        result_lines.append(f"  - Components: {len(components)} total, {started_components} started")
-        result_lines.append(f"  - Total component instances across all hosts: {total_instances}")
+        result_lines.append(f"  - Components: {len(components)} types")
+        result_lines.append(f"  - Total instances across all hosts: {total_instances}")
+        for state, count in sorted(instance_state_counts.items()):
+            marker = " [!]" if state != "STARTED" else ""
+            result_lines.append(f"    {state}: {count}{marker}")
+        if non_started_total > 0:
+            result_lines.append(f"  [WARNING] {non_started_total} instance(s) are NOT in STARTED state across all components")
         
         return "\n".join(result_lines)
         
