@@ -2598,6 +2598,8 @@ async def list_ambari_metric_apps(
 @log_tool
 async def hdfs_dfadmin_report(
     cluster_name: Optional[str] = None,
+    # AMS 메트릭 조회 시간 범위(분). ?startTime=(N분전)&endTime=(지금) 쿼리에 사용.
+    # HTTP 소켓 타임아웃인 AMBARI_METRICS_TIMEOUT(초)과는 전혀 다른 개념.
     lookback_minutes: int = 10,
 ) -> str:
     """Produce a DFSAdmin-style capacity and DataNode report using Ambari metrics."""
@@ -2652,10 +2654,11 @@ async def hdfs_dfadmin_report(
         "ec_pending_deletion": "dfs.FSNamesystem.PendingDeletionECBlocks",
     }
 
-    cluster_values: Dict[str, Optional[float]] = {}
-    for key, metric in capacity_metrics.items():
-        value = await fetch_latest_metric_value(metric, app_id="namenode", duration_ms=lookback_ms)
-        cluster_values[key] = value
+    async def _fetch_nn_metric(key: str, metric: str) -> tuple[str, Optional[float]]:
+        return (key, await fetch_latest_metric_value(metric, app_id="namenode", duration_ms=lookback_ms))
+
+    nn_results = await asyncio.gather(*(_fetch_nn_metric(k, m) for k, m in capacity_metrics.items()))
+    cluster_values: Dict[str, Optional[float]] = dict(nn_results)
 
     # Fallback: fetch cluster-level metrics via Ambari REST API (NameNode component)
     # when AMS does not return capacity data.
@@ -2775,27 +2778,33 @@ async def hdfs_dfadmin_report(
                 or dfs_metrics.get("NonDFSUsed")
             )
 
-            if capacity_total is None:
-                capacity_total = await fetch_latest_metric_value(
+            async def _ams(metric: str) -> Optional[float]:
+                return await fetch_latest_metric_value(
+                    metric,
+                    app_id="datanode",
+                    hostnames=ams_host_filter,
+                    duration_ms=lookback_ms,
+                )
+
+            async def _maybe(val: Optional[float], metric: str) -> Optional[float]:
+                return val if val is not None else await _ams(metric)
+
+            # Fetch AMS fallbacks for capacity + xceivers in parallel
+            capacity_total, dfs_used_host, dfs_remaining_host, xceivers = await asyncio.gather(
+                _maybe(
+                    capacity_total,
                     "FSDatasetState.org.apache.hadoop.hdfs.server.datanode.fsdataset.impl.FsDatasetImpl.Capacity",
-                    app_id="datanode",
-                    hostnames=ams_host_filter,
-                    duration_ms=lookback_ms,
-                )
-            if dfs_used_host is None:
-                dfs_used_host = await fetch_latest_metric_value(
+                ),
+                _maybe(
+                    dfs_used_host,
                     "FSDatasetState.org.apache.hadoop.hdfs.server.datanode.fsdataset.impl.FsDatasetImpl.DfsUsed",
-                    app_id="datanode",
-                    hostnames=ams_host_filter,
-                    duration_ms=lookback_ms,
-                )
-            if dfs_remaining_host is None:
-                dfs_remaining_host = await fetch_latest_metric_value(
+                ),
+                _maybe(
+                    dfs_remaining_host,
                     "FSDatasetState.org.apache.hadoop.hdfs.server.datanode.fsdataset.impl.FsDatasetImpl.Remaining",
-                    app_id="datanode",
-                    hostnames=ams_host_filter,
-                    duration_ms=lookback_ms,
-                )
+                ),
+                _ams("dfs.datanode.DataNodeActiveXceiversCount"),
+            )
 
             if non_dfs_used is None and all(v is not None for v in (capacity_total, dfs_used_host, dfs_remaining_host)):
                 non_dfs_used = max(capacity_total - dfs_used_host - dfs_remaining_host, 0)
@@ -2838,12 +2847,6 @@ async def hdfs_dfadmin_report(
             lines.append("Cache Used%: 0.00%")
             lines.append("Cache Remaining%: 0.00%")
 
-            xceivers = await fetch_latest_metric_value(
-                "dfs.datanode.DataNodeActiveXceiversCount",
-                app_id="datanode",
-                hostnames=ams_host_filter,
-                duration_ms=lookback_ms,
-            )
             if xceivers is not None:
                 lines.append(f"Active Xceivers: {int(xceivers)}")
 
@@ -2891,19 +2894,24 @@ async def hdfs_dfadmin_report(
                 ("Blocks get local path info", "dfs.datanode.BlocksGetLocalPathInfo"),
             ]
 
-            block_values = []
-            for label, metric_name in block_metric_map:
-                metric_value = await fetch_latest_metric_value(
+            async def _fetch_block(label: str, metric_name: str) -> Optional[tuple[str, int | float]]:
+                val = await fetch_latest_metric_value(
                     metric_name,
                     app_id="datanode",
                     hostnames=ams_host_filter,
                     duration_ms=lookback_ms,
                 )
-                if metric_value is not None:
-                    try:
-                        block_values.append((label, int(metric_value)))
-                    except (TypeError, ValueError):
-                        block_values.append((label, float(metric_value)))
+                if val is None:
+                    return None
+                try:
+                    return (label, int(val))
+                except (TypeError, ValueError):
+                    return (label, float(val))
+
+            raw_block_results = await asyncio.gather(
+                *(_fetch_block(label, metric) for label, metric in block_metric_map)
+            )
+            block_values = [r for r in raw_block_results if r is not None]
 
             for label, value in block_values:
                 value_str = f"{value:.2f}" if isinstance(value, float) and not float(value).is_integer() else f"{int(value)}"

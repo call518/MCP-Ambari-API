@@ -3,6 +3,7 @@ Utility functions for Ambari API operations.
 This module contains helper functions used by the main Ambari API tools.
 """
 
+import asyncio
 import os
 import aiohttp
 import json
@@ -113,6 +114,9 @@ _DYNAMIC_CATALOG_CACHE: Dict[str, Any] = {
 
 # Private caches for metadata responses (key → {timestamp, entries})
 _METRICS_METADATA_CACHE: Dict[str, Dict[str, Any]] = {}
+
+# Lock to prevent thundering herd: 병렬 호출 시 catalog 빌드가 중복 실행되지 않도록 보호
+_catalog_lock: asyncio.Lock = asyncio.Lock()
 
 # Tokenization helper (split on non-alphanumeric)
 _TOKEN_SPLIT_RE = re.compile(r"[^a-z0-9]+")
@@ -607,64 +611,75 @@ async def ensure_metric_catalog(use_cache: bool = True) -> Tuple[Dict[str, List[
     cached_lookup = _DYNAMIC_CATALOG_CACHE.get("lookup") or {}
     cached_timestamp = float(_DYNAMIC_CATALOG_CACHE.get("timestamp", 0.0))
 
+    # 캐시가 유효하면 락 없이 즉시 반환 (hot path)
     if use_cache and cached_catalog and now - cached_timestamp < AMBARI_METRICS_METADATA_TTL:
         return cached_catalog, cached_lookup
 
-    entries = await get_metrics_metadata(None, use_cache=use_cache)
+    # 캐시 미스 시 락으로 보호: 동시에 여러 coroutine이 진입해도 빌드는 1회만 실행.
+    # 빌드 전체(AMS 요청 + 캐시 갱신)를 락 안에 두어 thundering herd 방지.
+    async with _catalog_lock:
+        # 락 획득 후 재확인: 대기 중이던 coroutine이 락을 얻었을 때 이미 빌드 완료된 경우 바로 반환
+        now = time.monotonic()
+        cached_catalog = _DYNAMIC_CATALOG_CACHE.get("catalog") or {}
+        cached_timestamp = float(_DYNAMIC_CATALOG_CACHE.get("timestamp", 0.0))
+        if use_cache and cached_catalog and now - cached_timestamp < AMBARI_METRICS_METADATA_TTL:
+            return cached_catalog, _DYNAMIC_CATALOG_CACHE.get("lookup") or {}
 
-    # Fallback: probe common apps individually if the bulk metadata query returns nothing.
-    if not entries:
-        aggregated: List[Dict[str, Any]] = []
-        for fallback_app in CURATED_METRIC_APP_IDS:
-            if _is_excluded_app(fallback_app):
+        entries = await get_metrics_metadata(None, use_cache=use_cache)
+
+        # Fallback: probe common apps individually if the bulk metadata query returns nothing.
+        if not entries:
+            aggregated: List[Dict[str, Any]] = []
+            for fallback_app in CURATED_METRIC_APP_IDS:
+                if _is_excluded_app(fallback_app):
+                    continue
+                fallback_entries = await get_metrics_metadata(fallback_app, use_cache=use_cache)
+                if fallback_entries:
+                    aggregated.extend(fallback_entries)
+            entries = aggregated
+
+        metrics_by_app: Dict[str, Set[str]] = {}
+        lookup: Dict[str, str] = {}
+
+        for entry in entries:
+            app_hint = entry.get("appid") or entry.get("appId") or entry.get("application")
+            metric_hint = entry.get("metricname") or entry.get("metricName") or entry.get("metric_name")
+            if not app_hint or not metric_hint:
                 continue
-            fallback_entries = await get_metrics_metadata(fallback_app, use_cache=use_cache)
-            if fallback_entries:
-                aggregated.extend(fallback_entries)
-        entries = aggregated
 
-    metrics_by_app: Dict[str, Set[str]] = {}
-    lookup: Dict[str, str] = {}
+            app_name = str(app_hint).strip()
+            metric_name = str(metric_hint).strip()
+            if not app_name or not metric_name:
+                continue
 
-    for entry in entries:
-        app_hint = entry.get("appid") or entry.get("appId") or entry.get("application")
-        metric_hint = entry.get("metricname") or entry.get("metricName") or entry.get("metric_name")
-        if not app_hint or not metric_hint:
-            continue
+            if _is_excluded_app(app_name):
+                continue
 
-        app_name = str(app_hint).strip()
-        metric_name = str(metric_hint).strip()
-        if not app_name or not metric_name:
-            continue
+            metrics_by_app.setdefault(app_name, set()).add(metric_name)
+            lookup.setdefault(_normalize_app_key(app_name), app_name)
 
-        if _is_excluded_app(app_name):
-            continue
+        catalog = {app: sorted(values) for app, values in metrics_by_app.items()}
 
-        metrics_by_app.setdefault(app_name, set()).add(metric_name)
-        lookup.setdefault(_normalize_app_key(app_name), app_name)
+        # Ensure canonical entries exist even when AMS metadata is sparse.
+        for canonical in APP_SYNONYMS.keys():
+            if _is_excluded_app(canonical):
+                continue
+            lower = _normalize_app_key(canonical)
+            lookup.setdefault(lower, canonical)
+            catalog.setdefault(canonical, [])
 
-    catalog = {app: sorted(values) for app, values in metrics_by_app.items()}
+        for excluded in list(catalog.keys()):
+            if _is_excluded_app(excluded):
+                catalog.pop(excluded, None)
+                lookup.pop(_normalize_app_key(excluded), None)
 
-    # Ensure canonical entries exist even when AMS metadata is sparse.
-    for canonical in APP_SYNONYMS.keys():
-        if _is_excluded_app(canonical):
-            continue
-        lower = _normalize_app_key(canonical)
-        lookup.setdefault(lower, canonical)
-        catalog.setdefault(canonical, [])
+        _DYNAMIC_CATALOG_CACHE = {
+            "timestamp": now,
+            "catalog": catalog,
+            "lookup": lookup,
+        }
 
-    for excluded in list(catalog.keys()):
-        if _is_excluded_app(excluded):
-            catalog.pop(excluded, None)
-            lookup.pop(_normalize_app_key(excluded), None)
-
-    _DYNAMIC_CATALOG_CACHE = {
-        "timestamp": now,
-        "catalog": catalog,
-        "lookup": lookup,
-    }
-
-    return catalog, lookup
+        return catalog, lookup
 
 
 def canonicalize_app_id(app_id: Optional[str], lookup: Optional[Dict[str, str]] = None) -> Optional[str]:
