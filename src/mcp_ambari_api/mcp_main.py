@@ -1374,6 +1374,317 @@ Current service state: {initial_state}"""
 
 @mcp.tool()
 @log_tool
+async def start_host_component(host_name: str, component_name: str) -> str:
+    """
+    Starts a specific component on a specific host in the Ambari cluster.
+
+    [Tool Role]: Dedicated tool for starting individual host-level components,
+    enabling fine-grained control without affecting other hosts or the overall service.
+
+    [Core Functions]:
+    - Start the specified component on the given host
+    - Skip if the component is already in STARTED state
+    - Return request information for progress tracking
+
+    [Required Usage Scenarios]:
+    - When a specific host's component is STOPPED but the overall service is STARTED
+    - When users request to start a component on a specific host (e.g., "start DataNode on host-A")
+    - When recovering a single component instance without restarting the entire service
+
+    Args:
+        host_name: Hostname where the component resides (e.g., "hdp-node-01.example.com")
+        component_name: Name of the component to start (e.g., "DATANODE", "NODEMANAGER")
+
+    Returns:
+        Start operation result (success: request info, failure: error message)
+    """
+    cluster_name = AMBARI_CLUSTER_NAME
+    try:
+        endpoint = f"/clusters/{cluster_name}/hosts/{host_name}/host_components/{component_name}"
+        check = await make_ambari_request(endpoint)
+
+        if check is None or check.get("error"):
+            return f"Error: Component '{component_name}' not found on host '{host_name}'."
+
+        current_state = check.get("HostRoles", {}).get("state", "UNKNOWN")
+
+        if current_state == "STARTED":
+            return f"Component '{component_name}' on '{host_name}' is already STARTED. No action needed."
+
+        payload = {
+            "RequestInfo": {
+                "context": f"Start {component_name} on {host_name} via MCP API"
+            },
+            "Body": {
+                "HostRoles": {
+                    "state": "STARTED"
+                }
+            }
+        }
+
+        response_data = await make_ambari_request(endpoint, method="PUT", data=payload)
+
+        if response_data is None or response_data.get("error"):
+            error_msg = response_data.get("error") if response_data else "Unknown error occurred"
+            return f"Error: Failed to start '{component_name}' on '{host_name}' - {error_msg}"
+
+        request_info = response_data.get("Requests")
+        if request_info is None:
+            return f"Component '{component_name}' on '{host_name}' start command sent successfully. Previous state: {current_state}"
+
+        request_id = request_info.get("id", "Unknown")
+        request_status = request_info.get("status", "Unknown")
+        request_href = response_data.get("href", "")
+
+        result_lines = [
+            f"START HOST COMPONENT: {component_name} on {host_name}",
+            "",
+            f"Cluster: {cluster_name}",
+            f"Host: {host_name}",
+            f"Component: {component_name}",
+            f"Previous State: {current_state}",
+            f"Request ID: {request_id}",
+            f"Status: {request_status}",
+            f"Monitor URL: {request_href}",
+            "",
+            "Use get_request_status(request_id) to track progress."
+        ]
+
+        return "\n".join(result_lines)
+
+    except Exception as e:
+        return f"Error: Exception occurred while starting '{component_name}' on '{host_name}' - {str(e)}"
+
+@mcp.tool()
+@log_tool
+async def stop_host_component(host_name: str, component_name: str) -> str:
+    """
+    Stops a specific component on a specific host in the Ambari cluster.
+
+    [Tool Role]: Dedicated tool for stopping individual host-level components,
+    enabling fine-grained control without affecting other hosts or the overall service.
+
+    [Core Functions]:
+    - Stop the specified component on the given host
+    - Skip if the component is already in INSTALLED (stopped) state
+    - Return request information for progress tracking
+
+    [Required Usage Scenarios]:
+    - When users request to stop a component on a specific host (e.g., "stop DataNode on host-A")
+    - When decommissioning or isolating a specific node's component
+    - When troubleshooting a single component instance
+
+    Args:
+        host_name: Hostname where the component resides (e.g., "hdp-node-01.example.com")
+        component_name: Name of the component to stop (e.g., "DATANODE", "NODEMANAGER")
+
+    Returns:
+        Stop operation result (success: request info, failure: error message)
+    """
+    cluster_name = AMBARI_CLUSTER_NAME
+    try:
+        endpoint = f"/clusters/{cluster_name}/hosts/{host_name}/host_components/{component_name}"
+        check = await make_ambari_request(endpoint)
+
+        if check is None or check.get("error"):
+            return f"Error: Component '{component_name}' not found on host '{host_name}'."
+
+        current_state = check.get("HostRoles", {}).get("state", "UNKNOWN")
+
+        if current_state in ["INSTALLED", "INSTALL_FAILED"]:
+            return f"Component '{component_name}' on '{host_name}' is already stopped (state: {current_state}). No action needed."
+
+        payload = {
+            "RequestInfo": {
+                "context": f"Stop {component_name} on {host_name} via MCP API"
+            },
+            "Body": {
+                "HostRoles": {
+                    "state": "INSTALLED"
+                }
+            }
+        }
+
+        response_data = await make_ambari_request(endpoint, method="PUT", data=payload)
+
+        if response_data is None or response_data.get("error"):
+            error_msg = response_data.get("error") if response_data else "Unknown error occurred"
+            return f"Error: Failed to stop '{component_name}' on '{host_name}' - {error_msg}"
+
+        request_info = response_data.get("Requests")
+        if request_info is None:
+            return f"Component '{component_name}' on '{host_name}' stop command sent successfully. Previous state: {current_state}"
+
+        request_id = request_info.get("id", "Unknown")
+        request_status = request_info.get("status", "Unknown")
+        request_href = response_data.get("href", "")
+
+        result_lines = [
+            f"STOP HOST COMPONENT: {component_name} on {host_name}",
+            "",
+            f"Cluster: {cluster_name}",
+            f"Host: {host_name}",
+            f"Component: {component_name}",
+            f"Previous State: {current_state}",
+            f"Request ID: {request_id}",
+            f"Status: {request_status}",
+            f"Monitor URL: {request_href}",
+            "",
+            "Use get_request_status(request_id) to track progress."
+        ]
+
+        return "\n".join(result_lines)
+
+    except Exception as e:
+        return f"Error: Exception occurred while stopping '{component_name}' on '{host_name}' - {str(e)}"
+
+@mcp.tool()
+@log_tool
+async def restart_host_component(host_name: str, component_name: str) -> str:
+    """
+    Restarts a specific component on a specific host in the Ambari cluster (stop then start).
+
+    [Tool Role]: Dedicated tool for restarting individual host-level components,
+    enabling fine-grained control without affecting other hosts or the overall service.
+
+    [Core Functions]:
+    - Stop the specified component on the given host and wait for completion
+    - Start the component and return request information
+    - Return clear success or error message for LLM automation
+
+    [Required Usage Scenarios]:
+    - When users request to restart a component on a specific host (e.g., "restart DataNode on host-A")
+    - When recovering a stuck or malfunctioning single component instance
+    - When applying config changes that require a component-level restart
+
+    Args:
+        host_name: Hostname where the component resides (e.g., "hdp-node-01.example.com")
+        component_name: Name of the component to restart (e.g., "DATANODE", "NODEMANAGER")
+
+    Returns:
+        Restart operation result (success: request info, failure: error message)
+    """
+    cluster_name = AMBARI_CLUSTER_NAME
+    try:
+        endpoint = f"/clusters/{cluster_name}/hosts/{host_name}/host_components/{component_name}"
+        check = await make_ambari_request(endpoint)
+
+        if check is None or check.get("error"):
+            return f"Error: Component '{component_name}' not found on host '{host_name}'."
+
+        initial_state = check.get("HostRoles", {}).get("state", "UNKNOWN")
+
+        # Step 1: Stop
+        stop_payload = {
+            "RequestInfo": {
+                "context": f"Stop {component_name} on {host_name} via MCP API"
+            },
+            "Body": {
+                "HostRoles": {
+                    "state": "INSTALLED"
+                }
+            }
+        }
+
+        stop_response = await make_ambari_request(endpoint, method="PUT", data=stop_payload)
+
+        if stop_response is None or stop_response.get("error"):
+            error_msg = stop_response.get("error") if stop_response else "Unknown error occurred"
+            return f"Error: Unable to stop '{component_name}' on '{host_name}'. {error_msg}"
+
+        stop_requests = stop_response.get("Requests")
+        if stop_requests is None:
+            stop_request_id = "N/A (already stopped)"
+        else:
+            stop_request_id = stop_requests.get("id", "Unknown")
+            if stop_request_id == "Unknown":
+                return f"Error: Failed to retrieve stop request ID for '{component_name}' on '{host_name}'."
+
+            # Step 2: Wait for stop to complete
+            while True:
+                status_response = await make_ambari_request(
+                    f"/clusters/{cluster_name}/requests/{stop_request_id}"
+                )
+
+                if status_response is None or status_response.get("error"):
+                    error_msg = status_response.get("error") if status_response else "Unknown error"
+                    return f"Error: Unable to check stop status for '{component_name}' on '{host_name}'. {error_msg}"
+
+                req_info = status_response.get("Requests", {})
+                req_status = req_info.get("request_status", "Unknown")
+                progress_percent = req_info.get("progress_percent", 0)
+
+                if req_status == "COMPLETED":
+                    break
+                elif req_status in ["FAILED", "ABORTED"]:
+                    return f"Error: Stop operation for '{component_name}' on '{host_name}' failed with status '{req_status}'."
+
+                logger.info("Stopping '%s' on '%s'... Progress: %d%%", component_name, host_name, progress_percent)
+                await asyncio.sleep(2)
+
+        # Step 3: Start
+        start_payload = {
+            "RequestInfo": {
+                "context": f"Start {component_name} on {host_name} via MCP API"
+            },
+            "Body": {
+                "HostRoles": {
+                    "state": "STARTED"
+                }
+            }
+        }
+
+        start_response = await make_ambari_request(endpoint, method="PUT", data=start_payload)
+
+        if start_response is None or start_response.get("error"):
+            error_msg = start_response.get("error") if start_response else "Unknown error occurred"
+            return f"Error: Unable to start '{component_name}' on '{host_name}'. {error_msg}"
+
+        start_requests = start_response.get("Requests")
+        if start_requests is None:
+            result_lines = [
+                f"RESTART HOST COMPONENT: {component_name} on {host_name}",
+                f"Stop Request ID: {stop_request_id}",
+                f"Start Request ID: N/A (immediate)",
+                "",
+                f"Cluster: {cluster_name}",
+                f"Host: {host_name}",
+                f"Component: {component_name}",
+                f"Initial State: {initial_state}",
+                f"Stop Status: COMPLETED",
+                f"Start Status: Command sent successfully",
+                "",
+                f"Next: get_host_details('{host_name}') to verify current state.",
+            ]
+            return "\n".join(result_lines)
+
+        start_request_id = start_requests.get("id", "Unknown")
+        start_status = start_requests.get("status", "Unknown")
+        start_href = start_response.get("href", "")
+
+        result_lines = [
+            f"RESTART HOST COMPONENT: {component_name} on {host_name}",
+            f"Stop Request ID: {stop_request_id}",
+            f"Start Request ID: {start_request_id}",
+            "",
+            f"Cluster: {cluster_name}",
+            f"Host: {host_name}",
+            f"Component: {component_name}",
+            f"Initial State: {initial_state}",
+            f"Stop Status: COMPLETED",
+            f"Start Status: {start_status}",
+            f"Start Monitor URL: {start_href}",
+            "",
+            f"Next: get_request_status({start_request_id}) for updates." if start_request_id != "Unknown" else f"Next: get_host_details('{host_name}') to verify state soon.",
+        ]
+        return "\n".join(result_lines)
+
+    except Exception as e:
+        logger.error("Error occurred while restarting '%s' on '%s': %s", component_name, host_name, str(e))
+        return f"Error: Restart of '{component_name}' on '{host_name}' failed: {str(e)}"
+
+@mcp.tool()
+@log_tool
 async def restart_all_services() -> str:
     """
     Restarts all services in the Ambari cluster (stop all, then start all).
