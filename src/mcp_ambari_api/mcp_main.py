@@ -32,6 +32,7 @@ from mcp_ambari_api.functions import (
     ensure_metric_catalog,
     canonicalize_app_id,
     get_metrics_for_app,
+    check_ams_availability,
 )
 # from .functions import (
 #     format_timestamp, 
@@ -2537,6 +2538,11 @@ async def list_ambari_metrics_metadata(
     include_dimensions: bool = False,
 ) -> str:
     """Retrieve metric metadata from Ambari Metrics service with optional filters."""
+    # Check AMS availability first
+    is_available, error_msg = await check_ams_availability()
+    if not is_available:
+        return f"ERROR: Ambari Metrics Service is unavailable.\n\n{error_msg}\n\nPlease ensure that:\n1. Ambari Metrics Collector service is started\n2. The service is accessible at {AMBARI_METRICS_BASE_URL}\n3. Network connectivity is working properly"
+    
     catalog, lookup = await ensure_metric_catalog()
     canonical_app = canonicalize_app_id(app_id, lookup)
     resolved_app = None
@@ -2940,6 +2946,10 @@ async def hdfs_dfadmin_report(
     lookback_minutes: int = 10,
 ) -> str:
     """Produce a DFSAdmin-style capacity and DataNode report using Ambari metrics."""
+    # Check AMS availability first
+    is_available, error_msg = await check_ams_availability()
+    if not is_available:
+        return f"ERROR: Ambari Metrics Service is unavailable.\n\n{error_msg}\n\nThis tool requires AMS to retrieve HDFS capacity and DataNode metrics.\nPlease ensure that:\n1. Ambari Metrics Collector service is started\n2. The service is accessible at {AMBARI_METRICS_BASE_URL}\n3. HDFS and DataNode services are running\n\nAlternatively, you can check HDFS status using:\n- get_cluster_services tool to verify service states\n- get_service_components tool for detailed component status"
 
     target_cluster = cluster_name or AMBARI_CLUSTER_NAME
     lookback_ms = max(1, lookback_minutes) * 60 * 1000
@@ -3286,6 +3296,10 @@ async def query_ambari_metrics(
     max_points: int = 120,
 ) -> str:
     """Fetch time-series metrics (exact metric names only) from Ambari Metrics."""
+    # Check AMS availability first
+    is_available, error_msg = await check_ams_availability()
+    if not is_available:
+        return f"ERROR: Ambari Metrics Service is unavailable.\\n\\n{error_msg}\\n\\nThis tool requires AMS to query time-series metrics.\\nPlease ensure that:\\n1. Ambari Metrics Collector service is started\\n2. The service is accessible at {AMBARI_METRICS_BASE_URL}\\n3. The target services are running and reporting metrics"
 
     start_ms, end_ms, window_desc = resolve_metrics_time_range(duration, start_time, end_time)
     if start_ms is None or end_ms is None:

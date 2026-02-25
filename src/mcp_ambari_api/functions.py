@@ -467,6 +467,38 @@ async def make_ambari_metrics_request(endpoint: str, params: Optional[Dict[str, 
         return {"error": f"Metrics request failed: {exc}"}
 
 
+async def check_ams_availability() -> tuple[bool, Optional[str]]:
+    """Check if Ambari Metrics Service is available.
+    
+    Returns:
+        tuple: (is_available, error_message)
+            - is_available: True if AMS is reachable, False otherwise
+            - error_message: None if available, error description otherwise
+    """
+    try:
+        # Use a lightweight endpoint to test connectivity
+        response = await make_ambari_metrics_request("/metrics/metadata", params={"metricName": "_ping"})
+        
+        if response is None:
+            return False, "No response from Ambari Metrics Service"
+        
+        if isinstance(response, dict) and response.get("error"):
+            error_msg = response["error"]
+            # Extract meaningful error info
+            if "Connect call failed" in error_msg or "Cannot connect" in error_msg:
+                return False, f"Cannot connect to Ambari Metrics Service ({AMBARI_METRICS_BASE_URL}). Please ensure the service is running."
+            elif "ConnectionRefusedError" in error_msg:
+                return False, f"Connection refused to Ambari Metrics Service ({AMBARI_METRICS_BASE_URL}). The service may be stopped."
+            else:
+                return False, f"Ambari Metrics Service error: {error_msg}"
+        
+        # If we got any response without error, consider it available
+        return True, None
+        
+    except Exception as exc:
+        return False, f"Failed to check AMS availability: {exc}"
+
+
 def parse_metrics_metadata(response_obj: Any) -> List[Dict[str, Any]]:
     """Parse AMS metadata response into a flat list of metric dictionaries."""
     if response_obj is None:
