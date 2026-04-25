@@ -19,8 +19,6 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
-      # - name: Replace mcp-config.json for PyPI
-      #   run: cp -f mcp-config.json.pypi mcp-config.json
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12.x"
