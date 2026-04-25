@@ -1,16 +1,17 @@
 [build-system]
-requires = ["setuptools>=61.0", "wheel"]
+requires = ["setuptools>=61.0", "wheel", "setuptools-scm"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "mcp-ambari-api"
-version = "0.0.0"
+dynamic = ["version"]
 description = "Model Context Protocol (MCP) server for Apache Ambari API integration. Provides comprehensive tools for managing Hadoop clusters including service operations, configuration management, status monitoring, and request tracking."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "aiohttp>=3.12.15",
     "fastmcp>=2.12.3",
+    "setuptools-scm>=10.0.5",
 ]
 
 [project.scripts]
@@ -22,6 +23,10 @@ include = ["mcp_ambari_api*"]
 
 [tool.setuptools]
 include-package-data = true
+
+[tool.setuptools_scm]
+version_scheme = "no-guess-dev"
+local_scheme = "no-local-version"
 
 [tool.setuptools.package-data]
 # Ensure non-Python resource files ship inside the wheel
