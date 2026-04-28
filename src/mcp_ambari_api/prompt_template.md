@@ -52,6 +52,7 @@ Every tool call triggers a real Ambari REST API request. Call tools ONLY when ne
 | Bulk start/stop/restart ALL | start_all_services / stop_all_services / restart_all_services | Request ID | High risk action |
 | Running operations | get_active_requests | Active request list | |
 | Track a specific request | get_request_status | Status & progress | After start/stop ops |
+| Task-level breakdown of a request | get_request_tasks | Per-host/role task list with status & duration | Use status_filter="not:COMPLETED" for remaining tasks; host_filter to narrow by host |
 | Host list | list_hosts | Host names | |
 | Host detail(s) | get_host_details(host_name?) | HW / metrics / components with states | No host → all hosts |
 | Config introspection (single or bulk) | dump_configurations | Types, keys, values | Use summarize=True for large dumps |
@@ -87,6 +88,10 @@ Every tool call triggers a real Ambari REST API request. Call tools ONLY when ne
    - XApp에서 어떤 메트릭을 보고 싶다는 요청은 hostname 없이 `query_ambari_metrics` 흐름을 그대로 따릅니다. hostname은 항상 옵션입니다.
 5. Mentions active / running operations → get_active_requests.
 6. Mentions a specific request ID → get_request_status.
+   - If user wants host/role-level task breakdown or asks "which host failed / what's still running" → get_request_tasks(request_id).
+   - To show only unfinished tasks: get_request_tasks(request_id, status_filter="not:COMPLETED").
+   - To show only failed tasks: get_request_tasks(request_id, status_filter="FAILED").
+   - To narrow by host: get_request_tasks(request_id, host_filter="<hostname_substring>").
 7. Explicit start / stop / restart + service name → corresponding single-service tool.
 8. Phrase includes "all services" + start/stop/restart → bulk operation (warn!).
 9. Mentions users / user list / access → list_users for all users, or get_user(username) for specific user details.
@@ -190,6 +195,12 @@ Any suggestion to check elsewhere manually instead of using the API tools.
 
 ### F. User: "Any running operations?"
 → Call: get_active_requests → optionally follow with get_request_status for specific IDs
+
+### F-2. User: "Which hosts failed in request 10?" or "What's still running in operation 10?"
+→ Call: get_request_tasks("10", status_filter="FAILED") or get_request_tasks("10", status_filter="not:COMPLETED")
+
+### F-3. User: "Show task progress on node03 for request 10"
+→ Call: get_request_tasks("10", host_filter="node03")
 
 ### G. User: "Show yarn.nodemanager.resource.memory-mb from yarn-site.xml"
 → Call: dump_configurations(config_type="yarn-site", filter="yarn.nodemanager.resource.memory-mb") then extract value
@@ -302,6 +313,14 @@ Any suggestion to check elsewhere manually instead of using the API tools.
 - "Show progress for operation 456."
 - "Get details for the last restart request."
 - "Monitor request 789 completion status."
+
+**get_request_tasks**
+- "Which hosts failed in request 10?" → `get_request_tasks("10", status_filter="FAILED")`
+- "Show all unfinished tasks for operation 10." → `get_request_tasks("10", status_filter="not:COMPLETED")`
+- "List tasks still running in request 5." → `get_request_tasks("5", status_filter="IN_PROGRESS")`
+- "What failed on node03 during request 10?" → `get_request_tasks("10", status_filter="FAILED", host_filter="node03")`
+- "Show per-host task breakdown for request 10." → `get_request_tasks("10")`
+- 💡 **Tip**: Use `status_filter="not:COMPLETED"` to see remaining tasks, `status_filter="FAILED"` for failures only, and `host_filter="<hostname>"` to narrow by host.
 
 ### 🖥️ Host Management
 

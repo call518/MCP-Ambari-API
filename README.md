@@ -492,6 +492,7 @@ This MCP server provides the following tools for Ambari cluster management:
 - `get_cluster_info` - Retrieve basic cluster information and status
 - `get_active_requests` - List currently active/running operations
 - `get_request_status` - Check status and progress of specific requests
+- `get_request_tasks` - Get per-host/role task breakdown for a specific request. Supports filtering by status (`status_filter="FAILED"`, `"not:COMPLETED"`, etc.) and by hostname substring (`host_filter="node01"`)
 
 ### Service Management
 

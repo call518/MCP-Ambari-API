@@ -1180,9 +1180,156 @@ async def get_request_status(request_id: str) -> str:
             result_lines.append(f"Description: {status_descriptions[status]}")
         
         return "\n".join(result_lines)
-        
+
     except Exception as e:
         return f"Error: Exception occurred while retrieving request status - {str(e)}"
+
+@mcp.tool()
+@log_tool
+async def get_request_tasks(
+    request_id: str,
+    status_filter: Optional[str] = None,
+    host_filter: Optional[str] = None,
+) -> str:
+    """
+    Retrieves task-level details for a specific Ambari request (host-by-host breakdown).
+
+    [Tool Role]: Provides granular, per-host task information for an Ambari request,
+    going beyond the summary level offered by get_request_status.
+
+    [Core Functions]:
+    - List all tasks (host/role/status/timing) belonging to a request
+    - Filter tasks by status (e.g. FAILED, IN_PROGRESS) or exclude a status (not:COMPLETED)
+    - Filter tasks by hostname to inspect a specific host
+    - Identify which hosts/roles are failing, pending, or still running
+
+    [Required Usage Scenarios]:
+    - When users want to know which hosts or roles failed/are pending in an operation
+    - When debugging a partially-failed bulk operation (e.g. "Start all services")
+    - When users ask for task details, host-level progress, or remaining tasks
+    - When request progress is near 100% but not complete and user wants to know what's left
+
+    Args:
+        request_id: ID of the Ambari request to inspect (integer string)
+        status_filter: Optional status to filter on. Use exact status names (PENDING,
+            IN_PROGRESS, COMPLETED, FAILED, ABORTED, TIMEDOUT) or prefix with "not:"
+            to exclude that status (e.g. "not:COMPLETED" shows only unfinished tasks).
+        host_filter: Optional hostname substring to restrict results to matching hosts.
+
+    Returns:
+        Task list formatted as a table (success) or an error message (failure).
+        - Success: header with request summary + per-task rows (task_id, host, role, status, duration)
+        - Failure: English error message describing the problem
+    """
+    cluster_name = AMBARI_CLUSTER_NAME
+    try:
+        # Fetch overall request info for context
+        req_endpoint = f"/clusters/{cluster_name}/requests/{request_id}"
+        req_data = await make_ambari_request(req_endpoint)
+        if req_data.get("error"):
+            return f"Error: Request '{request_id}' not found in cluster '{cluster_name}'."
+        req_info = req_data.get("Requests", {})
+
+        # Fetch all tasks for this request
+        tasks_endpoint = (
+            f"/clusters/{cluster_name}/requests/{request_id}/tasks"
+            "?fields=Tasks/id,Tasks/host_name,Tasks/role,Tasks/command,"
+            "Tasks/status,Tasks/exit_code,Tasks/start_time,Tasks/end_time,"
+            "Tasks/attempt_cnt,Tasks/command_detail"
+        )
+        tasks_data = await make_ambari_request(tasks_endpoint)
+        if tasks_data.get("error"):
+            return f"Error: Failed to retrieve tasks for request '{request_id}' - {tasks_data['error']}"
+
+        items = tasks_data.get("items", [])
+
+        # Apply filters
+        exclude_status: Optional[str] = None
+        include_status: Optional[str] = None
+        if status_filter:
+            if status_filter.startswith("not:"):
+                exclude_status = status_filter[4:].upper()
+            else:
+                include_status = status_filter.upper()
+
+        filtered: List[Dict] = []
+        for item in items:
+            task = item.get("Tasks", {})
+            task_status = task.get("status", "").upper()
+            if include_status and task_status != include_status:
+                continue
+            if exclude_status and task_status == exclude_status:
+                continue
+            if host_filter and host_filter.lower() not in task.get("host_name", "").lower():
+                continue
+            filtered.append(task)
+
+        # Build output
+        result_lines = [
+            f"REQUEST TASKS: {request_id}",
+            "",
+            f"Cluster      : {cluster_name}",
+            f"Request      : {req_info.get('request_context', 'N/A')}",
+            f"Status       : {req_info.get('request_status', 'Unknown')}",
+            f"Progress     : {req_info.get('progress_percent', 0)}%",
+            f"Total tasks  : {len(items)}",
+            f"Shown tasks  : {len(filtered)}",
+        ]
+
+        if status_filter:
+            result_lines.append(f"Status filter: {status_filter}")
+        if host_filter:
+            result_lines.append(f"Host filter  : {host_filter}")
+
+        if not filtered:
+            result_lines.append("")
+            result_lines.append("No tasks match the specified filters.")
+            return "\n".join(result_lines)
+
+        # Sort by task id
+        filtered.sort(key=lambda t: t.get("id", 0))
+
+        result_lines.append("")
+        result_lines.append(f"{'TASK_ID':<8} {'HOST':<35} {'ROLE':<30} {'CMD':<10} {'STATUS':<12} {'ATTEMPTS':<9} {'DURATION'}")
+        result_lines.append("-" * 120)
+
+        for task in filtered:
+            task_id = task.get("id", "-")
+            host = task.get("host_name", "-")
+            role = task.get("role", "-")
+            command = task.get("command", "-")
+            status = task.get("status", "-")
+            attempts = task.get("attempt_cnt", "-")
+
+            start_ms = task.get("start_time", 0) or 0
+            end_ms = task.get("end_time", 0) or 0
+            if start_ms > 0 and end_ms > 0:
+                duration_sec = (end_ms - start_ms) / 1000
+                duration_str = f"{duration_sec:.1f}s"
+            elif start_ms > 0:
+                duration_str = "running"
+            else:
+                duration_str = "pending"
+
+            result_lines.append(
+                f"{str(task_id):<8} {host:<35} {role:<30} {command:<10} {status:<12} {str(attempts):<9} {duration_str}"
+            )
+
+        # Status summary
+        status_counts: Dict[str, int] = {}
+        for task in filtered:
+            s = task.get("status", "UNKNOWN")
+            status_counts[s] = status_counts.get(s, 0) + 1
+
+        result_lines.append("")
+        result_lines.append("Status summary (filtered):")
+        for s, cnt in sorted(status_counts.items()):
+            result_lines.append(f"  {s}: {cnt}")
+
+        return "\n".join(result_lines)
+
+    except Exception as e:
+        return f"Error: Exception occurred while retrieving tasks for request '{request_id}' - {str(e)}"
 
 @mcp.tool()
 @log_tool
