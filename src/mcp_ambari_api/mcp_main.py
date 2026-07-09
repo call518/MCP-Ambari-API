@@ -3093,10 +3093,13 @@ async def hdfs_dfadmin_report(
     lookback_minutes: int = 10,
 ) -> str:
     """Produce a DFSAdmin-style capacity and DataNode report using Ambari metrics."""
-    # Check AMS availability first
-    is_available, error_msg = await check_ams_availability()
-    if not is_available:
-        return f"ERROR: Ambari Metrics Service is unavailable.\n\n{error_msg}\n\nThis tool requires AMS to retrieve HDFS capacity and DataNode metrics.\nPlease ensure that:\n1. Ambari Metrics Collector service is started\n2. The service is accessible at {AMBARI_METRICS_BASE_URL}\n3. HDFS and DataNode services are running\n\nAlternatively, you can check HDFS status using:\n- get_cluster_services tool to verify service states\n- get_service_components tool for detailed component status"
+    ams_available, ams_error_msg = await check_ams_availability()
+    if not ams_available:
+        logger.warning(
+            "hdfs_dfadmin_report continuing with Ambari REST API fallback; "
+            "AMS unavailable: %s",
+            ams_error_msg,
+        )
 
     target_cluster = cluster_name or AMBARI_CLUSTER_NAME
     lookback_ms = max(1, lookback_minutes) * 60 * 1000
@@ -3151,8 +3154,11 @@ async def hdfs_dfadmin_report(
     async def _fetch_nn_metric(key: str, metric: str) -> tuple[str, Optional[float]]:
         return (key, await fetch_latest_metric_value(metric, app_id="namenode", duration_ms=lookback_ms))
 
-    nn_results = await asyncio.gather(*(_fetch_nn_metric(k, m) for k, m in capacity_metrics.items()))
-    cluster_values: Dict[str, Optional[float]] = dict(nn_results)
+    if ams_available:
+        nn_results = await asyncio.gather(*(_fetch_nn_metric(k, m) for k, m in capacity_metrics.items()))
+        cluster_values: Dict[str, Optional[float]] = dict(nn_results)
+    else:
+        cluster_values = {key: None for key in capacity_metrics}
 
     # Fallback: fetch cluster-level metrics via Ambari REST API (NameNode component)
     # when AMS does not return capacity data.
@@ -3191,6 +3197,14 @@ async def hdfs_dfadmin_report(
 
     lines: List[str] = []
     lines.append(f"HDFS DFSAdmin Report (cluster: {target_cluster})")
+    if ams_available:
+        lines.append("Data source: Ambari Metrics Service + Ambari REST API")
+    else:
+        lines.append("Data source: Ambari REST API fallback")
+        lines.append(
+            "Warning: AMS unavailable, REST fallback used. "
+            f"AMS-only fields are shown as N/A or omitted. ({ams_error_msg})"
+        )
     lines.append("=" * 72)
     lines.append(f"Configured Capacity: {format_bytes(configured)}")
     lines.append(f"Present Capacity: {format_bytes(present_capacity)}")
@@ -3283,6 +3297,8 @@ async def hdfs_dfadmin_report(
                     non_dfs_used = max(capacity_total - dfs_used_host - dfs_remaining_host, 0)
 
             async def _ams(metric: str) -> Optional[float]:
+                if not ams_available:
+                    return None
                 return await fetch_latest_metric_value(
                     metric,
                     app_id="datanode",
@@ -3353,6 +3369,8 @@ async def hdfs_dfadmin_report(
 
             if xceivers is not None:
                 lines.append(f"Active Xceivers: {int(xceivers)}")
+            elif not ams_available:
+                lines.append("Active Xceivers: N/A")
 
             block_metric_map = [
                 ("Blocks read", "dfs.datanode.BlocksRead"),
@@ -3412,10 +3430,13 @@ async def hdfs_dfadmin_report(
                 except (TypeError, ValueError):
                     return (label, float(val))
 
-            raw_block_results = await asyncio.gather(
-                *(_fetch_block(label, metric) for label, metric in block_metric_map)
-            )
-            block_values = [r for r in raw_block_results if r is not None]
+            if ams_available:
+                raw_block_results = await asyncio.gather(
+                    *(_fetch_block(label, metric) for label, metric in block_metric_map)
+                )
+                block_values = [r for r in raw_block_results if r is not None]
+            else:
+                block_values = []
 
             for label, value in block_values:
                 value_str = f"{value:.2f}" if isinstance(value, float) and not float(value).is_integer() else f"{int(value)}"
