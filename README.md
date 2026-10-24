@@ -713,23 +713,6 @@ docker-compose logs -f mcp-server
 # "Get custom analysis for my_target"
 ```
 
-### Tag-based Package and Release Publishing
-
-The GitHub Actions workflow `.github/workflows/pypi-publish.yml` runs when a tag
-is pushed. Use a numeric `X.Y.Z` tag such as `3.7.9`, with no prefix or suffix.
-The workflow builds the wheel and source distribution, checks that their metadata
-matches the tag, and publishes them to TestPyPI followed by PyPI. Both registries
-must have Trusted Publishing configured for this repository, workflow, and their
-respective `testpypi` and `pypi` GitHub environments.
-
-After both package publications succeed, the workflow creates a GitHub Release
-named after the tag. Release notes contain full commit messages since the most
-recently published non-draft Release, in oldest-first topological order. The first
-Release includes all commits reachable from the tag. The previous release must
-be an ancestor of the current tag. Re-running the workflow preserves an existing published Release;
-an existing draft requires manual review. Registry uploads are not rolled back
-if a later publication step fails.
-
 ### Important Notes
 
 - **Always use `@mcp.tool()` and `@log_tool` decorators** for proper registration and logging
