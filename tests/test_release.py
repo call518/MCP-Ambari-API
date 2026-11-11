@@ -18,8 +18,15 @@ class ReleaseTests(unittest.TestCase):
         for tag in ("3.7.9", "0.1.0", "10.20.30"):
             self.assertEqual(release_version(tag), tag)
         for tag in (
-            "main", "3.7", "3.07.9", "3.7.9; echo unsafe", "v3.7.9",
-            "3.8.0a1", "3.8.0b1", "3.8.0rc1", "3.8.0.post1",
+            "main",
+            "3.7",
+            "3.07.9",
+            "3.7.9; echo unsafe",
+            "v3.7.9",
+            "3.8.0a1",
+            "3.8.0b1",
+            "3.8.0rc1",
+            "3.8.0.post1",
         ):
             with self.assertRaises(ValueError):
                 release_version(tag)
@@ -41,7 +48,9 @@ class ReleaseTests(unittest.TestCase):
     @patch("scripts.publish_release.command")
     def test_notes_include_full_messages_and_previous_release_range(self, command):
         command.side_effect = [
-            "current", "previous", "",
+            "current",
+            "previous",
+            "",
             "abcdef123\0Fix issue\n\nDetails with ``` and $(echo unsafe)\n\0\n",
         ]
         notes = release_notes("owner/repo", "3.7.9", "3.7.8")
@@ -58,7 +67,9 @@ class ReleaseTests(unittest.TestCase):
     @patch("scripts.publish_release.command")
     def test_existing_release_is_unchanged(self, command):
         command.side_effect = [
-            "sha", "sha", "sha",
+            "sha",
+            "sha",
+            "sha",
             json.dumps([[{"tag_name": "3.7.9", "draft": False}]]),
         ]
         publish_release("owner/repo", "3.7.9")
@@ -72,21 +83,43 @@ class ReleaseTests(unittest.TestCase):
 
     @patch("scripts.publish_release.release_notes", return_value="notes\n")
     @patch("scripts.publish_release.command")
-    def test_publish_uses_last_published_release(
-        self, command, notes
-    ):
-        command.side_effect = [
-            "sha", "sha", "sha",
-            json.dumps([[
-                {"tag_name": "3.7.8", "draft": False, "published_at": "2026-10-01"},
-                {"tag_name": "3.7.9", "draft": False, "published_at": "2026-10-02"},
-                {"tag_name": "future", "draft": True, "published_at": None},
-            ]]),
-            "",
-        ]
-        publish_release("owner/repo", "3.8.0")
-        notes.assert_called_once_with("owner/repo", "3.8.0", "3.7.9")
-        args = command.call_args.args
-        self.assertEqual(args[:3], ("gh", "release", "create"))
-        self.assertIn("--notes-file", args)
-        self.assertNotIn("--prerelease", args)
+    def test_publish_uses_last_published_release(self, command, notes):
+        with tempfile.TemporaryDirectory() as temporary:
+            asset = Path(temporary) / "package.mcpb"
+            asset.touch()
+            command.side_effect = [
+                "sha",
+                "sha",
+                "sha",
+                json.dumps(
+                    [
+                        [
+                            {
+                                "tag_name": "3.7.8",
+                                "draft": False,
+                                "published_at": "2026-10-01",
+                            },
+                            {
+                                "tag_name": "3.7.9",
+                                "draft": False,
+                                "published_at": "2026-10-02",
+                            },
+                            {"tag_name": "future", "draft": True, "published_at": None},
+                        ]
+                    ]
+                ),
+                "",
+            ]
+            publish_release("owner/repo", "3.8.0", [asset])
+            notes.assert_called_once_with("owner/repo", "3.8.0", "3.7.9")
+            args = command.call_args.args
+            self.assertEqual(args[:3], ("gh", "release", "create"))
+            self.assertIn("--notes-file", args)
+            self.assertIn(str(asset), args)
+            self.assertNotIn("--prerelease", args)
+
+    @patch("scripts.publish_release.command")
+    def test_missing_release_asset_stops_publication(self, command):
+        with self.assertRaises(ValueError):
+            publish_release("owner/repo", "3.8.0", [Path("missing.mcpb")])
+        command.assert_not_called()

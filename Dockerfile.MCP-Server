@@ -4,15 +4,21 @@ ARG PYTHON_VERSION=3.12
 
 WORKDIR /app
 
+ENV PYTHONPATH=/app/src \
+    PYTHONUNBUFFERED=1
+
 RUN dnf install -y epel-release \
         && dnf install -y python${PYTHON_VERSION} python${PYTHON_VERSION}-pip git procps-ng lsof telnet screen iputils nmap-ncat \
         && dnf clean all \
         && update-alternatives --install /usr/bin/python python /usr/bin/python${PYTHON_VERSION} 1000 --slave /usr/bin/pip pip /usr/bin/pip${PYTHON_VERSION}
 
-RUN pip install \
-        'uv>=0.8.5' \
-        'mcpo>=0.0.17' \
-        'fastmcp>=2.12.3' \
-        'aiohttp>=3.12.15'
+COPY pyproject.toml uv.lock /tmp/deps/
+
+RUN pip install --no-cache-dir 'uv==0.7.20' \
+        && uv export --project /tmp/deps --locked --no-emit-project --no-hashes \
+            -o /tmp/deps/requirements.txt \
+        && pip install --no-cache-dir --no-deps \
+            -r /tmp/deps/requirements.txt \
+        && rm -rf /tmp/deps
 
 CMD ["/bin/bash", "/app/scripts/mcp-server-docker-cmd.sh"]

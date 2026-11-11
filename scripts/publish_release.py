@@ -67,9 +67,15 @@ def release_notes(repository: str, tag: str, previous: str | None) -> str:
     return "\n".join(notes) + "\n"
 
 
-def publish_release(repository: str, tag: str) -> None:
+def publish_release(
+    repository: str, tag: str, assets: list[Path] | None = None
+) -> None:
     """Create a release once, using the last published release as the baseline."""
     release_version(tag)
+    release_assets = assets or []
+    for asset in release_assets:
+        if not asset.is_file():
+            raise ValueError(f"Release asset does not exist: {asset}")
     current = command("git", "rev-parse", "--verify", f"refs/tags/{tag}^{{commit}}")
     remote = command("gh", "api", f"repos/{repository}/commits/{tag}", "--jq", ".sha")
     if current != remote or current != command("git", "rev-parse", "HEAD"):
@@ -117,6 +123,7 @@ def publish_release(repository: str, tag: str) -> None:
             "--notes-file",
             str(path),
         ]
+        args.extend(str(asset) for asset in release_assets)
         command(*args)
     print(f"Published GitHub Release {tag} (previous release: {previous or 'none'}).")
 
@@ -125,9 +132,10 @@ def main() -> None:
     """Publish only when explicitly called by the final release job."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("tag")
+    parser.add_argument("assets", nargs="*", type=Path)
     args = parser.parse_args()
     try:
-        publish_release(os.environ["GITHUB_REPOSITORY"], args.tag)
+        publish_release(os.environ["GITHUB_REPOSITORY"], args.tag, args.assets)
     except subprocess.CalledProcessError as error:
         parser.exit(1, f"Release command failed: {error.stderr or error}\n")
     except (ValueError, KeyError, OSError) as error:
@@ -136,4 +144,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

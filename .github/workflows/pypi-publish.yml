@@ -19,6 +19,9 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12.x"
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
       - name: Install build tool
         run: pip install --upgrade build
       - name: Build distributions
@@ -29,10 +32,19 @@ jobs:
         run: python -m scripts.check_release "$RELEASE_TAG" dist
       - name: Test release automation
         run: python -m unittest discover -s tests -v
+      - name: Build Claude Desktop bundle
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: scripts/build-mcpb.sh "$RELEASE_TAG" mcpb-dist
       - uses: actions/upload-artifact@v7
         with:
           name: dist
           path: dist/
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v7
+        with:
+          name: mcpb
+          path: mcpb-dist/*.mcpb
           if-no-files-found: error
 
   publish-to-testpypi:
@@ -95,5 +107,9 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
+      - uses: actions/download-artifact@v8
+        with:
+          name: mcpb
+          path: mcpb-dist/
       - name: Publish release with commit messages
-        run: python3 -m scripts.publish_release "$RELEASE_TAG"
+        run: python3 -m scripts.publish_release "$RELEASE_TAG" mcpb-dist/*.mcpb

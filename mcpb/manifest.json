@@ -1,0 +1,107 @@
+{
+  "manifest_version": "0.4",
+  "name": "mcp-ambari-api",
+  "display_name": "MCP Ambari API",
+  "version": "0.0.0",
+  "description": "Manage and inspect Apache Ambari clusters from Claude Desktop.",
+  "author": {
+    "name": "call518"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/call518/MCP-Ambari-API.git"
+  },
+  "homepage": "https://github.com/call518/MCP-Ambari-API",
+  "documentation": "https://github.com/call518/MCP-Ambari-API#claude-desktop-with-mcpb",
+  "support": "https://github.com/call518/MCP-Ambari-API/issues",
+  "icon": "icon.png",
+  "server": {
+    "type": "uv",
+    "entry_point": "server.py",
+    "mcp_config": {
+      "command": "uv",
+      "args": ["run", "--directory", "${__dirname}", "server.py"],
+      "env": {
+        "SETUPTOOLS_SCM_PRETEND_VERSION": "0.0.0",
+        "AMBARI_HOST": "${user_config.ambari_host}",
+        "AMBARI_PORT": "${user_config.ambari_port}",
+        "AMBARI_USER": "${user_config.ambari_user}",
+        "AMBARI_PASS": "${user_config.ambari_pass}",
+        "AMBARI_CLUSTER_NAME": "${user_config.ambari_cluster_name}",
+        "AMBARI_METRICS_HOST": "${user_config.ambari_metrics_host}",
+        "AMBARI_METRICS_PORT": "${user_config.ambari_metrics_port}",
+        "AMBARI_METRICS_PROTOCOL": "${user_config.ambari_metrics_protocol}",
+        "MCP_LOG_LEVEL": "${user_config.mcp_log_level}"
+      }
+    }
+  },
+  "tools_generated": true,
+  "keywords": ["ambari", "hadoop", "cluster", "operations"],
+  "license": "MIT",
+  "compatibility": {
+    "platforms": ["darwin", "win32", "linux"]
+  },
+  "user_config": {
+    "ambari_host": {
+      "type": "string",
+      "title": "Ambari host",
+      "description": "Hostname or IP address of the Ambari server.",
+      "required": true
+    },
+    "ambari_port": {
+      "type": "string",
+      "title": "Ambari port",
+      "description": "Port used by the Ambari REST API.",
+      "default": "8080",
+      "required": true
+    },
+    "ambari_user": {
+      "type": "string",
+      "title": "Ambari username",
+      "description": "Username used to authenticate to Ambari.",
+      "default": "admin",
+      "required": true
+    },
+    "ambari_pass": {
+      "type": "string",
+      "title": "Ambari password",
+      "description": "Password used to authenticate to Ambari.",
+      "sensitive": true,
+      "required": true
+    },
+    "ambari_cluster_name": {
+      "type": "string",
+      "title": "Ambari cluster name",
+      "description": "Exact name of the target Ambari cluster.",
+      "required": true
+    },
+    "ambari_metrics_host": {
+      "type": "string",
+      "title": "Ambari Metrics host",
+      "description": "Hostname or IP address of the Ambari Metrics collector.",
+      "default": "127.0.0.1",
+      "required": true
+    },
+    "ambari_metrics_port": {
+      "type": "string",
+      "title": "Ambari Metrics port",
+      "description": "Port used by the Ambari Metrics collector.",
+      "default": "6188",
+      "required": true
+    },
+    "ambari_metrics_protocol": {
+      "type": "string",
+      "title": "Ambari Metrics protocol",
+      "description": "Protocol used to reach the Ambari Metrics collector.",
+      "default": "http",
+      "required": true
+    },
+    "mcp_log_level": {
+      "type": "string",
+      "title": "Log level",
+      "description": "Server logging verbosity.",
+      "default": "INFO",
+      "required": true
+    }
+  }
+}

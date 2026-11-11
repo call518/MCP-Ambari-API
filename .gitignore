@@ -12,8 +12,11 @@ wheels/
 **/__pycache__/
 **/.pytest_cache/
 
-# Environment files
+# Environment and local MCP configuration files
 .env
+.env.*
+!.env.example
+mcp-config.json.*.local
 
 .vscode*
 #.github/copilot-instructions.md
