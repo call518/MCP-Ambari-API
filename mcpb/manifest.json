@@ -20,7 +20,7 @@
     "entry_point": "server.py",
     "mcp_config": {
       "command": "uv",
-      "args": ["run", "--directory", "${__dirname}", "server.py"],
+      "args": ["run", "--python", "3.12", "--directory", "${__dirname}", "server.py"],
       "env": {
         "SETUPTOOLS_SCM_PRETEND_VERSION": "0.0.0",
         "AMBARI_HOST": "${user_config.ambari_host}",
@@ -39,7 +39,10 @@
   "keywords": ["ambari", "hadoop", "cluster", "operations"],
   "license": "MIT",
   "compatibility": {
-    "platforms": ["darwin", "win32", "linux"]
+    "platforms": ["darwin", "win32", "linux"],
+    "runtimes": {
+      "python": ">=3.12,<3.13"
+    }
   },
   "user_config": {
     "ambari_host": {

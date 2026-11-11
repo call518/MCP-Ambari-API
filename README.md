@@ -44,7 +44,8 @@ Prerequisites:
 5. Ask a read-only verification question such as “Show the Ambari cluster
    status.”
 
-The bundle uses stdio transport and `uv`; it does not expose a listening port.
+The bundle uses stdio transport, `uv`, and Python `3.12`; it does not expose a
+listening port.
 MCPB settings are stored by the desktop host and are not written into this
 repository.
 
@@ -262,7 +263,7 @@ query_ambari_metrics(
 
 ## Compatibility
 
-- Python `3.12` or newer
+- Python `3.12.x`
 - MCP stdio and Streamable HTTP transports
 - Claude Desktop MCPB through the UV runtime
 - Docker Compose stack with OpenWebUI `0.13.3`
