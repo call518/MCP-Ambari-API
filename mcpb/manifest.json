@@ -47,61 +47,61 @@
   "user_config": {
     "ambari_host": {
       "type": "string",
-      "title": "Ambari host",
+      "title": "Ambari host (AMBARI_HOST)",
       "description": "Hostname or IP address of the Ambari server.",
       "required": true
     },
     "ambari_port": {
       "type": "string",
-      "title": "Ambari port",
+      "title": "Ambari port (AMBARI_PORT)",
       "description": "Port used by the Ambari REST API.",
       "default": "8080",
       "required": true
     },
     "ambari_user": {
       "type": "string",
-      "title": "Ambari username",
+      "title": "Ambari username (AMBARI_USER)",
       "description": "Username used to authenticate to Ambari.",
       "default": "admin",
       "required": true
     },
     "ambari_pass": {
       "type": "string",
-      "title": "Ambari password",
+      "title": "Ambari password (AMBARI_PASS)",
       "description": "Password used to authenticate to Ambari.",
       "sensitive": true,
       "required": true
     },
     "ambari_cluster_name": {
       "type": "string",
-      "title": "Ambari cluster name",
+      "title": "Ambari cluster name (AMBARI_CLUSTER_NAME)",
       "description": "Exact name of the target Ambari cluster.",
       "required": true
     },
     "ambari_metrics_host": {
       "type": "string",
-      "title": "Ambari Metrics host",
+      "title": "Ambari Metrics host (AMBARI_METRICS_HOST)",
       "description": "Hostname or IP address of the Ambari Metrics collector.",
       "default": "127.0.0.1",
       "required": true
     },
     "ambari_metrics_port": {
       "type": "string",
-      "title": "Ambari Metrics port",
+      "title": "Ambari Metrics port (AMBARI_METRICS_PORT)",
       "description": "Port used by the Ambari Metrics collector.",
       "default": "6188",
       "required": true
     },
     "ambari_metrics_protocol": {
       "type": "string",
-      "title": "Ambari Metrics protocol",
+      "title": "Ambari Metrics protocol (AMBARI_METRICS_PROTOCOL)",
       "description": "Protocol used to reach the Ambari Metrics collector.",
       "default": "http",
       "required": true
     },
     "mcp_log_level": {
       "type": "string",
-      "title": "Log level",
+      "title": "Log level (MCP_LOG_LEVEL)",
       "description": "Server logging verbosity.",
       "default": "INFO",
       "required": true
