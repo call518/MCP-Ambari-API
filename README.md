@@ -54,6 +54,7 @@ Prerequisites:
 
 - Docker Engine with Docker Compose
 - A reachable Ambari cluster
+- An OpenWebUI model provider and a model that supports tool calling
 
 ```bash
 git clone https://github.com/call518/MCP-Ambari-API.git
@@ -84,9 +85,34 @@ The published ports bind to `127.0.0.1` by default. Set
 `DOCKER_BIND_ADDRESS` only when remote access is required, and enable
 authentication plus TLS at the network boundary before exposing the services.
 
-#### Connect OpenWebUI directly to MCP
+#### Configure OpenWebUI
 
-In OpenWebUI `0.7.2`, add an MCP connection using the URL visible from the
+Open `http://localhost:3001`, create the administrator account, and configure a
+model provider under **Settings → Admin → Connections**. For OpenAI, add a
+connection with these values:
+
+| Field | Value |
+|---|---|
+| URL | `https://api.openai.com/v1` |
+| Auth | `Bearer` |
+| API key | Your OpenAI API key |
+| API Type | `Chat Completions` |
+
+`Chat Completions` must be used with the Quick Start's default
+`DEFAULT_MODEL_PARAMS={"reasoning_effort":"none"}` setting. To use an OpenAI
+reasoning model with reasoning enabled instead, set `DEFAULT_MODEL_PARAMS={}`
+before the first start, select `Responses`, and leave **Reasoning Effort** at
+**Default** in the global, per-model, and chat settings. Mixing `Responses`
+with `reasoning_effort=none`, or `Chat Completions` with another reasoning
+effort, can cause tool calls to fail.
+
+Confirm that the model appears in a new chat, then add one of the following
+external tool-server connections under **Settings → Admin → Tools →
+Integrations**.
+
+**Option A: Direct MCP (recommended)**
+
+Add a connection of type `MCP (Streamable HTTP)` using the URL visible from the
 OpenWebUI container:
 
 ```text
@@ -94,8 +120,20 @@ http://mcp-server:8000/mcp
 ```
 
 Use `http://localhost:18001/mcp` only from a client running on the Docker host.
-MCPO is not required for direct MCP connections; it remains in the standard
-stack for OpenAPI-compatible clients.
+Use authentication `None` unless `REMOTE_AUTH_ENABLE=true`; when authentication
+is enabled, use `Bearer` with the configured `REMOTE_SECRET_KEY`.
+
+**Option B: MCPO (OpenAPI)**
+
+Add a connection of type `OpenAPI` with this URL:
+
+```text
+http://mcpo-proxy:8000/mcp-ambari-api
+```
+
+MCPO is not required for OpenWebUI; it remains in the standard stack for
+OpenAPI-compatible clients. Use the Compose service URLs above rather than
+`localhost` because OpenWebUI resolves them from inside its container.
 
 To start without MCPO:
 
@@ -227,7 +265,7 @@ query_ambari_metrics(
 - Python `3.12` or newer
 - MCP stdio and Streamable HTTP transports
 - Claude Desktop MCPB through the UV runtime
-- Docker Compose stack with OpenWebUI `0.7.2`
+- Docker Compose stack with OpenWebUI `0.13.3`
 - Apache Ambari environments that expose the Ambari REST API; exact behavior
   can vary by Ambari and Hadoop component version
 
@@ -235,7 +273,14 @@ query_ambari_metrics(
 
 ### OpenAI reasoning model rejects tool calls
 
-The Compose example seeds OpenWebUI with:
+The connection's **API Type** and **Reasoning Effort** must match:
+
+| Setup | API Type | Reasoning Effort |
+|---|---|---|
+| Quick Start default | `Chat Completions` | `none` |
+| Reasoning with tools | `Responses` | `Default` in every scope |
+
+The Compose example seeds the Quick Start default into OpenWebUI with:
 
 ```dotenv
 DEFAULT_MODEL_PARAMS={"reasoning_effort":"none"}
@@ -244,8 +289,10 @@ DEFAULT_MODEL_PARAMS={"reasoning_effort":"none"}
 OpenWebUI stores this value in its database on first startup. For an existing
 `open-webui-data` volume, set **Reasoning Effort** to `none` in the Admin UI or
 per-model settings instead. Per-chat settings can override both. Do not delete
-the data volume as a troubleshooting shortcut. Remove the global parameter if
-the selected provider does not support it.
+the data volume as a troubleshooting shortcut. If using `Responses`, remove
+the parameter from the global, per-model, and chat settings and leave Reasoning
+Effort at `Default`. Remove the global parameter if the selected provider does
+not support it.
 
 ### MCPO returns 401 Unauthorized
 
