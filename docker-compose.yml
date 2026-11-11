@@ -3,7 +3,7 @@ services:
     env_file: .env
     # image: ghcr.io/open-webui/open-webui:main
     # image: ghcr.io/open-webui/open-webui:0.6.22
-    image: ghcr.io/open-webui/open-webui:0.13.2
+    image: ghcr.io/open-webui/open-webui:0.13.3
     container_name: mcp-ambari-api-open-webui
     ports:
       - "${DOCKER_BIND_ADDRESS:-127.0.0.1}:${DOCKER_EXTERNAL_PORT_OPENWEBUI}:8080"
