@@ -19,6 +19,11 @@ Example requests:
 - “Find NameNode heap metrics available in AMS.”
 - “Restart HDFS after showing me the affected components.”
 
+**More requests to try:** see
+[Example queries by area](docs/usage-guide.md#example-queries-by-area) for
+cluster and services, service operations, requests and tasks, hosts,
+configurations, users, alerts, and metrics.
+
 ## Quick start
 
 Choose one installation method. MCPB is the shortest path for Claude Desktop;
@@ -190,8 +195,9 @@ docker compose up -d mcp-server open-webui
 - stdio and Streamable HTTP transports
 - Optional bearer authentication for Streamable HTTP
 
-The canonical tool-selection and safety guidance is in
-[`prompt_template.md`](src/mcp_ambari_api/prompt_template.md). Tool availability
+Cross-tool safety and reporting rules are sent to clients as MCP server
+instructions from
+[`server_instructions.md`](src/mcp_ambari_api/server_instructions.md). Tool availability
 can evolve, so MCP clients should use `tools/list` rather than relying on a
 copied static tool list.
 
@@ -327,7 +333,7 @@ Install and run with the existing uv project:
 ```bash
 uv sync --dev
 uv run ruff check src tests scripts
-uv run python -m unittest discover -s tests -v
+uv run pytest
 ```
 
 Run MCP Inspector against local source:

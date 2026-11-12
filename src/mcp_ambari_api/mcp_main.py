@@ -76,7 +76,15 @@ def _build_static_token_auth(secret_key: str) -> StaticTokenVerifier:
 # Initialize MCP instance once for decorator registration.
 # Runtime authentication is configured in main() before mcp.run().
 logger.info("Initializing MCP instance")
-mcp = FastMCP("mcp-ambari-api")
+# Server instructions are injected into the model context by clients such as
+# Claude Code and OpenWebUI. Claude Code truncates them beyond 4,096 characters,
+# so keep the file short and limited to rules that span multiple tools.
+SERVER_INSTRUCTIONS = (
+    pkg_resources.files("mcp_ambari_api")
+    .joinpath("server_instructions.md")
+    .read_text(encoding="utf-8")
+)
+mcp = FastMCP("mcp-ambari-api", instructions=SERVER_INSTRUCTIONS)
 
 # =============================================================================
 # Constants
@@ -3793,104 +3801,6 @@ async def query_ambari_metrics(
             lines.append(f"  - {label}: {detail}")
 
     return "\n".join(lines)
-
-@mcp.tool()
-async def get_prompt_template(section: Optional[str] = None, mode: Optional[str] = None) -> str:
-    """Return the canonical English prompt template (optionally a specific section).
-
-    Simplified per project decision: only a single English template file `PROMPT_TEMPLATE.md` is maintained.
-
-    Args:
-        section: (optional) section number or keyword (case-insensitive) e.g. "1", "purpose", "tool map".
-        mode: (optional) if "headings" returns just the list of section headings with numeric indices.
-    """
-    # Template is packaged as mcp_ambari_api/prompt_template.md for PyPI distribution
-    try:
-        content = pkg_resources.files('mcp_ambari_api').joinpath('prompt_template.md').read_text(encoding='utf-8')  # type: ignore[arg-type]
-    except FileNotFoundError:
-        return "Error: prompt_template.md not found inside package mcp_ambari_api." 
-    except Exception as e:
-        return f"Error: Unable to read packaged prompt_template.md - {e}" 
-
-    if mode == 'headings':
-        import re
-        raw_headings = [line[3:].strip() for line in content.splitlines() if line.startswith('## ')]
-        # Each raw heading already starts with its own numeric prefix (e.g. "1. Purpose"),
-        # so we avoid double-numbering like "1. 1. Purpose" by stripping existing prefix and re-indexing.
-        cleaned = []
-        for h in raw_headings:
-            m = re.match(r'^(\d+)\.\s+(.*)$', h)
-            if m:
-                cleaned.append(m.group(2).strip())
-            else:
-                cleaned.append(h)
-        lines = ["Section Headings:"]
-        for idx, title in enumerate(cleaned, 1):
-            lines.append(f"{idx}. {title}")
-        return "\n".join(lines)
-
-    if not section:
-        return content
-
-    lowered = section.lower().strip()
-    sections = {}
-    current_key = None
-    accumulator = []
-    for line in content.splitlines():
-        if line.startswith('## '):
-            if current_key:
-                sections[current_key] = '\n'.join(accumulator).strip()
-            title = line[3:].strip()
-            key = title.lower()
-            sections[key] = ''
-            if key and key[0].isdigit():
-                num = key.split('.', 1)[0]
-                sections[num] = ''
-            current_key = key
-            accumulator = [line]
-        else:
-            accumulator.append(line)
-    if current_key:
-        sections[current_key] = '\n'.join(accumulator).strip()
-
-    if lowered in sections and sections[lowered]:
-        return sections[lowered]
-    for k, v in sections.items():
-        if lowered in k and v:
-            return v
-    sample_keys = ', '.join(list(sections.keys())[:8])
-    return f"Section '{section}' not found. Available sample keys: {sample_keys}"
-
-# =============================================================================
-# MCP Prompts (for prompts/list exposure)
-# =============================================================================
-
-@mcp.prompt("prompt_template_full")
-async def prompt_template_full() -> str:
-    """Return the full canonical prompt template."""
-    return await get_prompt_template()
-
-@mcp.prompt("prompt_template_headings")
-async def prompt_template_headings() -> str:
-    """Return compact list of section headings."""
-    return await get_prompt_template(mode="headings")
-
-@mcp.prompt("prompt_template_section")
-async def prompt_template_section(section: Optional[str] = None) -> str:
-    """Return a specific prompt template section by number or keyword.
-
-    If 'section' is omitted: returns a concise help block plus a compact headings list instead of erroring.
-    """
-    if not section:
-        headings_block = await get_prompt_template(mode="headings")
-        # Reuse exact multi-line format from prompt_template_headings for consistency.
-        return "\n".join([
-            "[HELP] Missing 'section' argument.",
-            "Specify a section number or keyword.",
-            "Examples: 1 | purpose | tool map | decision flow",
-            headings_block.strip()
-        ])
-    return await get_prompt_template(section=section)
 
 # =============================================================================
 # Server Execution

@@ -26,7 +26,7 @@ cp "$repo_dir/src/mcp_ambari_api/__init__.py" \
   "$repo_dir/src/mcp_ambari_api/__main__.py" \
   "$repo_dir/src/mcp_ambari_api/functions.py" \
   "$repo_dir/src/mcp_ambari_api/mcp_main.py" \
-  "$repo_dir/src/mcp_ambari_api/prompt_template.md" \
+  "$repo_dir/src/mcp_ambari_api/server_instructions.md" \
   "$stage/src/mcp_ambari_api/"
 sed -e "s/\"version\": \"0.0.0\"/\"version\": \"$version\"/" \
   -e "s/\"SETUPTOOLS_SCM_PRETEND_VERSION\": \"0.0.0\"/\"SETUPTOOLS_SCM_PRETEND_VERSION\": \"$version\"/" \

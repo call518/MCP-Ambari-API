@@ -25,7 +25,7 @@ This MCP server supports dual transport modes with flexible configuration via CL
 - **Docker Development**: `docker-compose up -d` starts full stack (OpenWebUI + MCP server + MCPO proxy)
 - **Build & Deploy**: Version-specific Docker images via `build-mcp-server-docker-image.sh` and `build-mcpo-server-docker-image.sh`
 - **Package Structure**: Entry point is `mcp-ambari-api` console script → `mcp_ambari_api.mcp_main:main`
-- **Environment Setup**: Use `PYTHONPATH=./src` for local development, packaged resources in `mcp_ambari_api/prompt_template.md`
+- **Environment Setup**: Use `PYTHONPATH=./src` for local development, packaged resources in `mcp_ambari_api/server_instructions.md`
 
 ## Configuration Files
 - `mcp-config.json.stdio`: Local/command-line MCP client configuration
@@ -33,7 +33,8 @@ This MCP server supports dual transport modes with flexible configuration via CL
 - `docker-compose.yml` maps `mcp-config.json.http` into MCPO proxy container
 
 ## AI Agent Integration
-- **Canonical Prompt**: `src/mcp_ambari_api/prompt_template.md` contains the official system prompt with tool selection decision tree
+- **Server Instructions**: `src/mcp_ambari_api/server_instructions.md` is passed to `FastMCP(instructions=...)` and holds only rules that span multiple tools. Keep it under 4,096 characters (Claude Code truncates longer text) and edit it only when such a cross-tool rule changes
+- **Adding or changing tools**: Describe tool selection and arguments in the tool docstring, and add user-facing example requests to `docs/usage-guide.md` (`## Example queries by area`)
 - **Safety-First**: Bulk operations (start/stop/restart all services) require explicit user intent
 - **Real Data Only**: AI agents must use tools for all cluster data—no guessing or hypothetical responses
 - **Tool Mapping**: Comprehensive table maps user intents/keywords to specific tools (e.g., "services" → `get_cluster_services`)
@@ -47,5 +48,6 @@ This MCP server supports dual transport modes with flexible configuration via CL
 ## Key Files to Understand
 - `src/mcp_ambari_api/mcp_main.py`: Tool definitions, transport selection, main entrypoint
 - `src/mcp_ambari_api/functions.py`: `make_ambari_request()`, `@log_tool` decorator, formatting utilities
-- `src/mcp_ambari_api/prompt_template.md`: AI agent decision tree and tool selection guide
+- `src/mcp_ambari_api/server_instructions.md`: MCP server instructions (cross-tool rules)
+- `docs/usage-guide.md`: User-facing example requests by area
 - `docker-compose.yml`: Multi-container orchestration with environment mapping

@@ -35,7 +35,15 @@ docker-compose up -d
 ./build-mcpo-server-docker-image.sh
 ```
 
-No tests or linting tools are currently configured.
+```bash
+# Tests (pytest; also runs the unittest-based release tests)
+uv run pytest
+```
+
+Server instructions live in `src/mcp_ambari_api/server_instructions.md` (passed to
+`FastMCP(instructions=...)`). Keep them under 4,096 characters and change them only
+when a cross-tool rule changes; put tool guidance in docstrings and user-facing
+example requests in `docs/usage-guide.md`.
 
 ## Architecture
 
