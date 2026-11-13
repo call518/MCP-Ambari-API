@@ -1,7 +1,7 @@
 {
   "manifest_version": "0.4",
   "name": "mcp-ambari-api",
-  "display_name": "MCP Ambari API",
+  "display_name": "MCP-Ambari-API",
   "version": "0.0.0",
   "description": "Manage and inspect Apache Ambari clusters from Claude Desktop.",
   "author": {
