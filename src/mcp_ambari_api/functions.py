@@ -596,6 +596,10 @@ async def get_metrics_metadata(app_id: Optional[str] = None, use_cache: bool = T
 
     response = await make_ambari_metrics_request("/metrics/metadata", params=params or None)
     entries = parse_metrics_metadata(response)
+    if response is None or (isinstance(response, dict) and response.get("error")):
+        # Do not cache failures; the next call retries AMS instead of serving
+        # an empty result for the whole TTL.
+        return entries
 
     provided_app = app_id.strip() if isinstance(app_id, str) and app_id.strip() else None
     for entry in entries:
@@ -706,11 +710,15 @@ async def ensure_metric_catalog(use_cache: bool = True) -> Tuple[Dict[str, List[
                 catalog.pop(excluded, None)
                 lookup.pop(_normalize_app_key(excluded), None)
 
-        _DYNAMIC_CATALOG_CACHE = {
-            "timestamp": now,
-            "catalog": catalog,
-            "lookup": lookup,
-        }
+        # Cache only catalogs built from real AMS metadata. With no entries
+        # (AMS unreachable or empty), the catalog holds only placeholder appIds
+        # and caching it would hide recovered AMS data for the whole TTL.
+        if entries:
+            _DYNAMIC_CATALOG_CACHE = {
+                "timestamp": now,
+                "catalog": catalog,
+                "lookup": lookup,
+            }
 
         return catalog, lookup
 

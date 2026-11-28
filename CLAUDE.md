@@ -80,6 +80,10 @@ Optional Bearer token auth via FastMCP's `StaticTokenVerifier`. Configured via `
 
 Cluster management, service lifecycle (start/stop/restart), configuration introspection, host/user management, alerting (current and historical), Ambari Metrics Service (AMS) time-series queries, and HDFS capacity reporting.
 
+Naming and access convention (enforced by `tests/test_tool_access.py`):
+- Read tools are named `get_*`, registered with `@read_tool()` (`readOnlyHint=True`, tag `read`), and send only GET requests.
+- Write tools are named `set_*`, registered with `@write_tool()` (`destructiveHint=True`, tag `write`), and take an `action` argument where applicable. Read-only mode (`MCP_READ_ONLY` / `--read-only`) disables the `write` tag.
+
 ## Configuration
 
 All configuration is via environment variables (see `.env.example`). Key variables:
@@ -88,6 +92,7 @@ All configuration is via environment variables (see `.env.example`). Key variabl
 - `FASTMCP_TYPE`, `FASTMCP_HOST`, `FASTMCP_PORT` — transport configuration
 - `REMOTE_AUTH_ENABLE`, `REMOTE_SECRET_KEY` — optional auth
 - `MCP_LOG_LEVEL` — logging level
+- `MCP_READ_ONLY` — hide write (`set_*`) tools
 
 ## CI/CD
 

@@ -188,8 +188,9 @@ docker compose up -d mcp-server open-webui
 
 ## Capabilities
 
-- Cluster, service, component, host, request, user, and alert inspection
-- Service start, stop, restart, maintenance, and configuration workflows
+- Cluster, service, component, host, request, user, alert, and configuration
+  inspection
+- Service, all-services, and host component start, stop, and restart
 - HDFS `dfsadmin`-style capacity and DataNode reports
 - Live Ambari Metrics metadata discovery and exact-name time-series queries
 - stdio and Streamable HTTP transports
@@ -200,6 +201,18 @@ instructions from
 [`server_instructions.md`](src/mcp_ambari_api/server_instructions.md). Tool availability
 can evolve, so MCP clients should use `tools/list` rather than relying on a
 copied static tool list.
+
+### Read and write tools
+
+| Kind | Name prefix | MCP annotations | Tag | Behavior |
+|---|---|---|---|---|
+| Read | `get_*` | `readOnlyHint: true` | `read` | Sends only GET requests to Ambari and AMS |
+| Write | `set_*` | `readOnlyHint: false`, `destructiveHint: true` | `write` | Changes cluster state |
+
+Write tools take `action` = `start`, `stop`, or `restart`:
+`set_service_state`, `set_all_services_state`, and `set_host_component_state`.
+In read-only mode (`MCP_READ_ONLY=true` or `--read-only`), write tools are
+not listed and calls to them are rejected.
 
 ## Configuration
 
@@ -216,9 +229,10 @@ precedence over defaults.
 | `MCP_LOG_LEVEL` | `INFO` | Log level |
 | `REMOTE_AUTH_ENABLE` | `false` | Enable HTTP bearer authentication |
 | `REMOTE_SECRET_KEY` | empty | Required when authentication is enabled |
+| `MCP_READ_ONLY` | `false` | Expose only read tools (`get_*`); hide write tools (`set_*`) |
 
-CLI equivalents are `--type`, `--host`, `--port`, `--auth-enable`, and
-`--secret-key`.
+CLI equivalents are `--type`, `--host`, `--port`, `--auth-enable` /
+`--auth-disable`, `--secret-key`, and `--read-only` / `--read-write`.
 
 ### Ambari settings
 
@@ -239,15 +253,15 @@ CLI equivalents are `--type`, `--host`, `--port`, `--auth-enable`, and
 Ambari metric names are exact identifiers rather than natural-language labels.
 Use this sequence:
 
-1. Call `list_ambari_metric_apps` to discover valid app IDs.
-2. Call `list_common_metrics_catalog` or
-   `list_ambari_metrics_metadata` to find an exact metric name.
-3. Call `query_ambari_metrics` with an explicit `app_id` and exact metric name.
+1. Call `get_ambari_metric_apps` to discover valid app IDs.
+2. Call `get_common_metrics_catalog` or
+   `get_ambari_metrics_metadata` to find an exact metric name.
+3. Call `get_ambari_metrics` with an explicit `app_id` and exact metric name.
 
 Example:
 
 ```text
-query_ambari_metrics(
+get_ambari_metrics(
   metric_names="jvm.JvmMetrics.MemHeapUsedM",
   app_id="namenode",
   duration="1h",
@@ -264,8 +278,8 @@ query_ambari_metrics(
 - Plain HTTP does not protect credentials in transit. Use a TLS reverse proxy
   for remote access.
 - Keep unauthenticated development services bound to localhost.
-- Review service-wide start, stop, restart, and configuration changes before
-  approving them in the MCP client.
+- Review `set_*` tool calls (start, stop, restart) before approving them in the
+  MCP client. Set `MCP_READ_ONLY=true` for monitoring-only deployments.
 
 ## Compatibility
 

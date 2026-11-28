@@ -39,17 +39,25 @@ chooses tools itself, so the actual tool calls can differ.
 
 ### ⚙️ Service Operations
 
-**start_service / stop_service / restart_service**
-- "Start the HDFS service."
-- "Stop the MapReduce service."
-- "Restart the YARN service."
+State-changing tools are named `set_*` and take `action` = `start`, `stop`, or
+`restart`. They are not available when the server runs in read-only mode
+(`MCP_READ_ONLY=true` or `--read-only`).
+
+**set_service_state**
+- "Start the HDFS service." → `set_service_state("HDFS", action="start")`
+- "Stop the MapReduce service." → `set_service_state("MAPREDUCE2", action="stop")`
+- "Restart the YARN service." → `set_service_state("YARN", action="restart")`
 - "Please restart the HBase service."
 
-**start_all_services / stop_all_services / restart_all_services**
-- "Start all cluster services."
-- "Stop all services in the cluster."
-- "Restart all cluster services."
+**set_all_services_state**
+- "Start all cluster services." → `set_all_services_state(action="start")`
+- "Stop all services in the cluster." → `set_all_services_state(action="stop")`
+- "Restart all cluster services." → `set_all_services_state(action="restart")`
 - ⚠️ **Warning**: These are bulk operations that affect the entire cluster.
+
+**set_host_component_state**
+- "Restart the DataNode on node03." → `set_host_component_state("node03", "DATANODE", action="restart")`
+- "Stop the NodeManager on node05." → `set_host_component_state("node05", "NODEMANAGER", action="stop")`
 
 ### 📊 Operations & Monitoring
 
@@ -75,7 +83,7 @@ chooses tools itself, so the actual tool calls can differ.
 
 ### 🖥️ Host Management
 
-**list_hosts**
+**get_hosts**
 - "List all hosts in the cluster."
 - "Show cluster node inventory."
 - "Display all available hosts."
@@ -89,7 +97,7 @@ chooses tools itself, so the actual tool calls can differ.
 
 ### 🔧 Configuration Management
 
-**dump_configurations**
+**get_configurations**
 - "Show all configuration types available."
 - "Display HDFS configuration settings."
 - "Get YARN resource manager configuration."
@@ -99,7 +107,7 @@ chooses tools itself, so the actual tool calls can differ.
 
 ### 👥 User Management
 
-**list_users**
+**get_users**
 - "Show all cluster users."
 - "List users with access to Ambari."
 - "Display user accounts and their roles."
@@ -127,21 +135,21 @@ chooses tools itself, so the actual tool calls can differ.
 
 ### 📈 Metrics & Trends
 
-**list_common_metrics_catalog**
+**get_common_metrics_catalog**
 - "What NameNode metrics can I query?"
 - "Search the catalog for heap usage metrics."
 - "Show common metrics for the ResourceManager."
 - "List NodeManager metrics containing JVM threads."
-- 💡 **Tip**: use `search="heap"`, `"gc"`, etc. to narrow the catalog, then copy the exact metric names for `query_ambari_metrics`.
+- 💡 **Tip**: use `search="heap"`, `"gc"`, etc. to narrow the catalog, then copy the exact metric names for `get_ambari_metrics`.
 
-**query_ambari_metrics**
-- "Show the last hour of NameNode heap usage." → `query_ambari_metrics(metric_names="jvm.JvmMetrics.MemHeapUsedM", app_id="namenode", duration="1h")`
-- "Trend SafeMode time for the past 6 hours." → `query_ambari_metrics(metric_names="dfs.FSNamesystem.SafeModeTime", app_id="namenode", duration="6h")`
-- "Compare DataNode heap usage on bigtop-hostname0.demo.local and bigtop-hostname1.demo.local over 30 minutes." → `query_ambari_metrics(metric_names="jvm.JvmMetrics.MemHeapUsedM", app_id="datanode", duration="30m", hostnames="bigtop-hostname0.demo.local,bigtop-hostname1.demo.local", group_by_host=true)`
-- "Show pending YARN memory for the last day." → `query_ambari_metrics(metric_names="yarn.QueueMetrics.Queue=root.PendingMB", app_id="resourcemanager", duration="24h")`
+**get_ambari_metrics**
+- "Show the last hour of NameNode heap usage." → `get_ambari_metrics(metric_names="jvm.JvmMetrics.MemHeapUsedM", app_id="namenode", duration="1h")`
+- "Trend SafeMode time for the past 6 hours." → `get_ambari_metrics(metric_names="dfs.FSNamesystem.SafeModeTime", app_id="namenode", duration="6h")`
+- "Compare DataNode heap usage on bigtop-hostname0.demo.local and bigtop-hostname1.demo.local over 30 minutes." → `get_ambari_metrics(metric_names="jvm.JvmMetrics.MemHeapUsedM", app_id="datanode", duration="30m", hostnames="bigtop-hostname0.demo.local,bigtop-hostname1.demo.local", group_by_host=true)`
+- "Show pending YARN memory for the last day." → `get_ambari_metrics(metric_names="yarn.QueueMetrics.Queue=root.PendingMB", app_id="resourcemanager", duration="24h")`
 - 💡 **Tip**: Hostnames are optional—omit them for cluster-wide stats or specify explicit hosts to focus on particular nodes. If Ambari returns no datapoints, re-check the identifiers via `/ws/v1/timeline/metrics/metadata`.
 
-**hdfs_dfadmin_report**
+**get_hdfs_dfsadmin_report**
 - "Show the HDFS dfsadmin report."
 - "Summarize NameNode capacity and DataNode usage like dfsadmin."
 - 💡 **Tip**: Uses AMS metrics; include `cluster_name` when monitoring multiple clusters.

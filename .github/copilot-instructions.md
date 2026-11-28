@@ -16,7 +16,7 @@ This MCP server supports dual transport modes with flexible configuration via CL
 - **Tool Definition**: Every Ambari operation is an async function with `@mcp.tool()` + `@log_tool` decorators
 - **API Abstraction**: All Ambari REST calls go through `make_ambari_request()` in `functions.py` with automatic auth, error handling, and timing
 - **Environment Configuration**: Ambari connection via `AMBARI_HOST`, `AMBARI_PORT`, `AMBARI_USER`, `AMBARI_PASS`, `AMBARI_CLUSTER_NAME` env vars
-- **Unified Tool Pattern**: Modern tools like `dump_configurations` replace multiple specialized tools (superseded `get_configurations`, `list_configurations`)
+- **Unified Tool Pattern**: Modern tools like `get_configurations` replace multiple specialized tools (superseded `dump_configurations`, `list_configurations`)
 - **Error Handling**: Structured `{"error": "..."}` responses with HTTP status codes and timing info
 - **Logging**: The `@log_tool` decorator provides uniform timing, argument preview, and result categorization (SUCCESS/ERROR/EXCEPTION)
 

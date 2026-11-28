@@ -3,10 +3,12 @@ MCP tool definitions for Ambari REST API operations.
 
 - Ambari API Documents: https://github.com/apache/ambari/blob/trunk/ambari-server/docs/api/v1/index.md
 """
-from typing import Dict, Optional, List, Any, Set
+from typing import Dict, Optional, List, Any, Set, Literal
 from urllib.parse import parse_qs
 import argparse
 from fastmcp import FastMCP
+from mcp.types import ToolAnnotations
+from fastmcp.exceptions import ResourceError
 from fastmcp.server.auth import StaticTokenVerifier
 import os
 import importlib.resources as pkg_resources
@@ -87,8 +89,43 @@ SERVER_INSTRUCTIONS = (
 mcp = FastMCP("mcp-ambari-api", instructions=SERVER_INSTRUCTIONS)
 
 # =============================================================================
+# Tool Access Classification
+# =============================================================================
+# Every tool is either a read tool (get_*, GET requests only) or a write tool
+# (set_*, changes cluster state). The tags drive read-only mode in main(); the
+# annotations let MCP clients tell the two kinds apart without parsing names.
+
+READ_TOOL_TAG = "read"
+WRITE_TOOL_TAG = "write"
+READ_TOOL_ANNOTATIONS = ToolAnnotations(readOnlyHint=True, openWorldHint=False)
+WRITE_TOOL_ANNOTATIONS = ToolAnnotations(
+    readOnlyHint=False,
+    destructiveHint=True,
+    idempotentHint=False,
+    openWorldHint=False,
+)
+
+
+def read_tool(title: Optional[str] = None):
+    """Register a read-only MCP tool (get_*)."""
+    return mcp.tool(
+        title=title, annotations=READ_TOOL_ANNOTATIONS, tags={READ_TOOL_TAG}
+    )
+
+
+def write_tool(title: Optional[str] = None):
+    """Register a state-changing MCP tool (set_*); hidden in read-only mode."""
+    return mcp.tool(
+        title=title, annotations=WRITE_TOOL_ANNOTATIONS, tags={WRITE_TOOL_TAG}
+    )
+
+# =============================================================================
 # Constants
 # =============================================================================
+
+ALL_SERVICES_ALREADY_STOPPED = (
+    "No services are currently running. All services are already stopped."
+)
 
 HOST_FILTER_REQUIRED_COMPONENTS = {
     "datanode": "DATANODE",
@@ -98,6 +135,20 @@ HOST_FILTER_REQUIRED_COMPONENTS = {
 # =============================================================================
 # Helper Functions
 # =============================================================================
+
+async def ams_unavailable_message() -> Optional[str]:
+    """Return an error message when Ambari Metrics Service is unreachable, else None."""
+    is_available, error_msg = await check_ams_availability()
+    if is_available:
+        return None
+    return (
+        f"ERROR: Ambari Metrics Service is unavailable.\n\n{error_msg}\n\n"
+        "This tool requires AMS. Please ensure that:\n"
+        "1. Ambari Metrics Collector service is started\n"
+        f"2. The service is accessible at {AMBARI_METRICS_BASE_URL}\n"
+        "3. Network connectivity is working properly"
+    )
+
 
 async def check_service_active_requests(cluster_name: str, service_name: str) -> List[Dict]:
     """
@@ -144,9 +195,9 @@ async def check_service_active_requests(cluster_name: str, service_name: str) ->
 # =============================================================================
 
 
-@mcp.tool(title="Dump Configurations")
+@read_tool(title="Get Configurations")
 @log_tool
-async def dump_configurations(
+async def get_configurations(
     config_type: Optional[str] = None,
     service_filter: Optional[str] = None,
     filter: Optional[str] = None,
@@ -155,7 +206,7 @@ async def dump_configurations(
     limit: int = 0,
     max_chars: int = 30000,
 ) -> str:
-    """Unified configuration introspection tool (supersedes get_configurations & list_configurations & dump_all_configurations).
+    """Unified configuration introspection tool (supersedes list_configurations & dump_all_configurations).
 
     Modes:
       1) Single type values: specify config_type=<type>
@@ -280,9 +331,9 @@ async def dump_configurations(
             return result[:max_chars] + f"\n... [TRUNCATED {len(result)-max_chars} chars]"
         return result
     except Exception as e:
-        return f"[ERROR] dump_configurations failed: {e}"
+        return f"[ERROR] get_configurations failed: {e}"
 
-@mcp.tool()
+@read_tool()
 @log_tool
 async def get_cluster_info() -> str:
     """
@@ -328,7 +379,7 @@ async def get_cluster_info() -> str:
     except Exception as e:
         return f"Error: Exception occurred while retrieving cluster information - {str(e)}"
 
-@mcp.tool()
+@read_tool()
 @log_tool
 async def get_active_requests() -> str:
     """
@@ -408,7 +459,7 @@ async def get_active_requests() -> str:
     except Exception as e:
         return f"Error: Exception occurred while retrieving active requests - {str(e)}"
 
-@mcp.tool()
+@read_tool()
 @log_tool
 async def get_cluster_services() -> str:
     """
@@ -472,7 +523,7 @@ async def get_cluster_services() -> str:
     except Exception as e:
         return f"Error: Exception occurred while retrieving service list - {str(e)}"
 
-@mcp.tool()
+@read_tool()
 @log_tool
 async def get_service_status(service_name: str) -> str:
     """
@@ -501,8 +552,9 @@ async def get_service_status(service_name: str) -> str:
         endpoint = f"/clusters/{cluster_name}/services/{service_name}?fields=ServiceInfo/state,ServiceInfo/service_name,ServiceInfo/cluster_name"
         response_data = await make_ambari_request(endpoint)
         
-        if response_data is None:
-            return f"Error: Unable to retrieve status for service '{service_name}' in cluster '{cluster_name}'."
+        if response_data is None or response_data.get("error"):
+            detail = response_data.get("error") if response_data else "no response"
+            return f"Error: Unable to retrieve status for service '{service_name}' in cluster '{cluster_name}'. {detail}"
         
         service_info = response_data.get("ServiceInfo", {})
         
@@ -533,7 +585,7 @@ async def get_service_status(service_name: str) -> str:
     except Exception as e:
         return f"Error: Exception occurred while retrieving service status - {str(e)}"
 
-@mcp.tool()
+@read_tool()
 @log_tool
 async def get_service_components(service_name: str) -> str:
     """
@@ -563,8 +615,9 @@ async def get_service_components(service_name: str) -> str:
         endpoint = f"/clusters/{cluster_name}/services/{service_name}/components?fields=ServiceComponentInfo/component_name,ServiceComponentInfo/state,ServiceComponentInfo/category,ServiceComponentInfo/started_count,ServiceComponentInfo/installed_count,ServiceComponentInfo/total_count,host_components/HostRoles/host_name,host_components/HostRoles/state"
         response_data = await make_ambari_request(endpoint)
         
-        if response_data is None:
-            return f"Error: Unable to retrieve components for service '{service_name}' in cluster '{cluster_name}'."
+        if response_data is None or response_data.get("error"):
+            detail = response_data.get("error") if response_data else "no response"
+            return f"Error: Unable to retrieve components for service '{service_name}' in cluster '{cluster_name}'. {detail}"
         
         if "items" not in response_data:
             return f"No components found for service '{service_name}' in cluster '{cluster_name}'."
@@ -672,7 +725,7 @@ async def get_service_components(service_name: str) -> str:
     except Exception as e:
         return f"Error: Exception occurred while retrieving components for service '{service_name}' - {str(e)}"
 
-@mcp.tool()
+@read_tool()
 @log_tool
 async def get_service_details(service_name: str) -> str:
     """
@@ -701,15 +754,16 @@ async def get_service_details(service_name: str) -> str:
         cluster_endpoint = f"/clusters/{cluster_name}"
         cluster_response = await make_ambari_request(cluster_endpoint)
         
-        if cluster_response is None:
+        if cluster_response is None or cluster_response.get("error"):
             return f"Error: Cluster '{cluster_name}' not found or inaccessible. Please check cluster name and Ambari server connection."
         
         # Get detailed service information
         service_endpoint = f"/clusters/{cluster_name}/services/{service_name}?fields=ServiceInfo,components/ServiceComponentInfo"
         service_response = await make_ambari_request(service_endpoint)
         
-        if service_response is None:
-            return f"Error: Service '{service_name}' not found in cluster '{cluster_name}'. Please check service name."
+        if service_response is None or service_response.get("error"):
+            detail = service_response.get("error") if service_response else "no response"
+            return f"Error: Service '{service_name}' not found in cluster '{cluster_name}'. Please check service name. {detail}"
         
         service_info = service_response.get("ServiceInfo", {})
         components = service_response.get("components", [])
@@ -757,9 +811,7 @@ async def get_service_details(service_name: str) -> str:
     except Exception as e:
         return f"Error: Exception occurred while retrieving service details - {str(e)}"
 
-@mcp.tool()
-@log_tool
-async def start_all_services() -> str:
+async def _start_all_services() -> str:
     """
     Starts all services in an Ambari cluster (equivalent to "Start All" in Ambari Web UI).
 
@@ -841,9 +893,7 @@ async def start_all_services() -> str:
     except Exception as e:
         return f"Error: Exception occurred while starting all services - {str(e)}"
 
-@mcp.tool()
-@log_tool
-async def stop_all_services() -> str:
+async def _stop_all_services() -> str:
     """
     Stops all services in an Ambari cluster (equivalent to "Stop All" in Ambari Web UI).
 
@@ -880,7 +930,7 @@ async def stop_all_services() -> str:
         
         services = services_response.get("items", [])
         if not services:
-            return "No services are currently running. All services are already stopped."
+            return ALL_SERVICES_ALREADY_STOPPED
         
         # Try the standard bulk stop approach first
         stop_endpoint = f"/clusters/{cluster_name}/services"
@@ -910,7 +960,7 @@ async def stop_all_services() -> str:
                 }
             }
             
-            stop_response = await make_ambari_request(alt_endpoint, method="PUT", data=stop_payload)
+            stop_response = await make_ambari_request(alt_endpoint, method="PUT", data=alt_payload)
             
             if stop_response.get("error"):
                 return f"Error: Failed to stop services in cluster '{cluster_name}'. {stop_response['error']}"
@@ -938,9 +988,7 @@ async def stop_all_services() -> str:
     except Exception as e:
         return f"Error: Exception occurred while stopping all services - {str(e)}"
 
-@mcp.tool()
-@log_tool
-async def start_service(service_name: str) -> str:
+async def _start_service(service_name: str) -> str:
     """
     Starts a specific service in the Ambari cluster.
 
@@ -1028,9 +1076,7 @@ async def start_service(service_name: str) -> str:
     except Exception as e:
         return f"Error: Exception occurred while starting service '{service_name}' - {str(e)}"
 
-@mcp.tool()
-@log_tool
-async def stop_service(service_name: str) -> str:
+async def _stop_service(service_name: str) -> str:
     """
     Stops a specific service in the Ambari cluster.
 
@@ -1117,7 +1163,7 @@ async def stop_service(service_name: str) -> str:
     except Exception as e:
         return f"Error: Exception occurred while stopping service '{service_name}' - {str(e)}"
 
-@mcp.tool()
+@read_tool()
 @log_tool
 async def get_request_status(request_id: str) -> str:
     """
@@ -1192,7 +1238,7 @@ async def get_request_status(request_id: str) -> str:
     except Exception as e:
         return f"Error: Exception occurred while retrieving request status - {str(e)}"
 
-@mcp.tool()
+@read_tool()
 @log_tool
 async def get_request_tasks(
     request_id: str,
@@ -1339,9 +1385,7 @@ async def get_request_tasks(
     except Exception as e:
         return f"Error: Exception occurred while retrieving tasks for request '{request_id}' - {str(e)}"
 
-@mcp.tool()
-@log_tool
-async def restart_service(service_name: str) -> str:
+async def _restart_service(service_name: str) -> str:
     """
     Restarts a specific service in an Ambari cluster (stop then start).
 
@@ -1525,9 +1569,7 @@ Current service state: {initial_state}"""
         logger.error("Error occurred while restarting service '%s': %s", service_name, str(e))
         return f"Error: Service '{service_name}' restart operation failed: {str(e)}"
 
-@mcp.tool()
-@log_tool
-async def start_host_component(host_name: str, component_name: str) -> str:
+async def _start_host_component(host_name: str, component_name: str) -> str:
     """
     Starts a specific component on a specific host in the Ambari cluster.
 
@@ -1608,9 +1650,7 @@ async def start_host_component(host_name: str, component_name: str) -> str:
     except Exception as e:
         return f"Error: Exception occurred while starting '{component_name}' on '{host_name}' - {str(e)}"
 
-@mcp.tool()
-@log_tool
-async def stop_host_component(host_name: str, component_name: str) -> str:
+async def _stop_host_component(host_name: str, component_name: str) -> str:
     """
     Stops a specific component on a specific host in the Ambari cluster.
 
@@ -1691,9 +1731,7 @@ async def stop_host_component(host_name: str, component_name: str) -> str:
     except Exception as e:
         return f"Error: Exception occurred while stopping '{component_name}' on '{host_name}' - {str(e)}"
 
-@mcp.tool()
-@log_tool
-async def restart_host_component(host_name: str, component_name: str) -> str:
+async def _restart_host_component(host_name: str, component_name: str) -> str:
     """
     Restarts a specific component on a specific host in the Ambari cluster (stop then start).
 
@@ -1836,9 +1874,7 @@ async def restart_host_component(host_name: str, component_name: str) -> str:
         logger.error("Error occurred while restarting '%s' on '%s': %s", component_name, host_name, str(e))
         return f"Error: Restart of '{component_name}' on '{host_name}' failed: {str(e)}"
 
-@mcp.tool()
-@log_tool
-async def restart_all_services() -> str:
+async def _restart_all_services() -> str:
     """
     Restarts all services in the Ambari cluster (stop all, then start all).
 
@@ -1862,33 +1898,37 @@ async def restart_all_services() -> str:
     cluster_name = AMBARI_CLUSTER_NAME
     try:
         # Step 1: Stop all services
-        stop_result = await stop_all_services()
+        stop_result = await _stop_all_services()
         if stop_result.startswith("Error"):
             return f"Error: Unable to stop all services. {stop_result}"
 
-        # Extract stop request ID
-        lines = stop_result.splitlines()
-        stop_request_id = None
-        for line in lines:
-            if line.startswith("Request ID:"):
-                stop_request_id = line.split(":", 1)[1].strip()
-                break
-        if not stop_request_id or stop_request_id == "Unknown":
-            return f"Error: Failed to retrieve stop request ID for all services."
+        if stop_result == ALL_SERVICES_ALREADY_STOPPED:
+            # Nothing to stop; proceed directly to the start phase.
+            stop_request_id = "N/A (already stopped)"
+        else:
+            # Extract stop request ID
+            lines = stop_result.splitlines()
+            stop_request_id = None
+            for line in lines:
+                if line.startswith("Request ID:"):
+                    stop_request_id = line.split(":", 1)[1].strip()
+                    break
+            if not stop_request_id or stop_request_id == "Unknown":
+                return f"Error: Failed to retrieve stop request ID for all services."
 
-        # Wait for stop operation to complete (no progress output)
-        while True:
-            status_result = await get_request_status(stop_request_id)
-            if status_result.startswith("Error"):
-                return f"Error: Unable to check status of stop operation for all services. {status_result}"
-            if "Status: COMPLETED" in status_result:
-                break
-            elif "Status: FAILED" in status_result or "Status: ABORTED" in status_result:
-                return f"Error: Stop operation for all services failed. {status_result}"
-            await asyncio.sleep(2)
+            # Wait for stop operation to complete (no progress output)
+            while True:
+                status_result = await get_request_status(stop_request_id)
+                if status_result.startswith("Error"):
+                    return f"Error: Unable to check status of stop operation for all services. {status_result}"
+                if "Status: COMPLETED" in status_result:
+                    break
+                elif "Status: FAILED" in status_result or "Status: ABORTED" in status_result:
+                    return f"Error: Stop operation for all services failed. {status_result}"
+                await asyncio.sleep(2)
 
         # Step 2: Start all services (capture request id)
-        start_result = await start_all_services()
+        start_result = await _start_all_services()
         if start_result.startswith("Error"):
             return f"Error: Unable to start all services. {start_result}"
 
@@ -1918,9 +1958,119 @@ async def restart_all_services() -> str:
     except Exception as e:
         return f"Error: All services restart operation failed: {str(e)}"
 
-@mcp.tool()
+StateAction = Literal["start", "stop", "restart"]
+
+
+@write_tool()
 @log_tool
-async def list_hosts() -> str:
+async def set_service_state(service_name: str, action: StateAction) -> str:
+    """
+    Starts, stops, or restarts one service in the Ambari cluster.
+
+    [Tool Role]: State-changing tool for a single service. Use read tools
+    (get_service_status, get_cluster_services) to inspect state first.
+
+    [Actions]:
+    - start: set the service to STARTED; no-op if it is already STARTED
+    - stop: set the service to INSTALLED (stopped); no-op if already stopped
+    - restart: refuse if the service has active requests; otherwise stop, wait
+      for the stop request to complete, then submit the start request
+
+    [Required Usage Scenarios]:
+    - When users explicitly ask to start, stop, or restart a named service
+      (e.g., "start HDFS", "stop YARN", "restart HBase")
+
+    Args:
+        service_name: Name of the service (e.g., "HDFS", "YARN", "HBASE")
+        action: One of "start", "stop", "restart"
+
+    Returns:
+        Operation result with the Ambari request ID for progress tracking via
+        get_request_status, or an English error message.
+    """
+    handlers = {
+        "start": _start_service,
+        "stop": _stop_service,
+        "restart": _restart_service,
+    }
+    return await handlers[action](service_name)
+
+
+@write_tool()
+@log_tool
+async def set_all_services_state(action: StateAction) -> str:
+    """
+    Starts, stops, or restarts all services in the Ambari cluster
+    (equivalent to "Start All" / "Stop All" in Ambari Web UI).
+
+    [Tool Role]: State-changing tool for the whole cluster. Use only when the
+    user clearly asks for all services; confirm with the user first.
+
+    [Actions]:
+    - start: submit a cluster-level request setting all services to STARTED
+    - stop: submit a cluster-level request setting all services to INSTALLED;
+      no-op if no service is currently STARTED
+    - restart: stop all services, wait for the stop request to complete, then
+      submit the start-all request
+
+    Args:
+        action: One of "start", "stop", "restart"
+
+    Returns:
+        Operation result with the Ambari request ID(s) for progress tracking via
+        get_request_status, or an English error message.
+    """
+    handlers = {
+        "start": _start_all_services,
+        "stop": _stop_all_services,
+        "restart": _restart_all_services,
+    }
+    return await handlers[action]()
+
+
+@write_tool()
+@log_tool
+async def set_host_component_state(
+    host_name: str, component_name: str, action: StateAction
+) -> str:
+    """
+    Starts, stops, or restarts one component on one host in the Ambari cluster.
+
+    [Tool Role]: State-changing tool for a single host component, without
+    affecting other hosts or the overall service. Use get_host_details or
+    get_service_components to find host and component names first.
+
+    [Actions]:
+    - start: set the host component to STARTED; no-op if already STARTED
+    - stop: set the host component to INSTALLED (stopped); no-op if already
+      stopped
+    - restart: stop, wait for the stop request to complete, then submit the
+      start request
+
+    [Required Usage Scenarios]:
+    - When users ask to start, stop, or restart a component on a specific host
+      (e.g., "restart DataNode on host-A")
+
+    Args:
+        host_name: Hostname where the component resides (e.g., "hdp-node-01.example.com")
+        component_name: Name of the component (e.g., "DATANODE", "NODEMANAGER")
+        action: One of "start", "stop", "restart"
+
+    Returns:
+        Operation result with the Ambari request ID for progress tracking via
+        get_request_status, or an English error message.
+    """
+    handlers = {
+        "start": _start_host_component,
+        "stop": _stop_host_component,
+        "restart": _restart_host_component,
+    }
+    return await handlers[action](host_name, component_name)
+
+
+@read_tool()
+@log_tool
+async def get_hosts() -> str:
     """
     Retrieves the list of hosts in the Ambari cluster.
 
@@ -1966,7 +2116,7 @@ async def list_hosts() -> str:
     except Exception as e:
         return f"Error: Exception occurred while retrieving hosts - {str(e)}"
 
-@mcp.tool()
+@read_tool()
 @log_tool
 async def get_host_details(host_name: Optional[str] = None) -> str:
     """
@@ -2044,9 +2194,9 @@ async def get_host_details(host_name: Optional[str] = None) -> str:
     except Exception as e:
         return f"Error: Exception occurred while retrieving host details - {str(e)}"
 
-@mcp.tool()
+@read_tool()
 @log_tool
-async def list_users() -> str:
+async def get_users() -> str:
     """List all users in the Ambari system.
     
     Returns a formatted list of all users with their basic information.
@@ -2082,7 +2232,7 @@ async def list_users() -> str:
     except Exception as e:
         return f"Error: Exception occurred while retrieving users - {str(e)}"
 
-@mcp.tool()
+@read_tool()
 @log_tool
 async def get_user(user_name: str) -> str:
     """Get detailed information about a specific user.
@@ -2180,7 +2330,7 @@ async def get_user(user_name: str) -> str:
     except Exception as e:
         return f"Error: Exception occurred while retrieving user '{user_name}' - {str(e)}"
 
-@mcp.tool()
+@read_tool()
 @log_tool
 async def get_alerts_history(
     mode: str = "current",
@@ -2616,7 +2766,7 @@ async def get_alerts_history(
     except Exception as e:
         return f"Error: Exception occurred while retrieving {mode} alerts - {str(e)}"
 
-@mcp.tool()
+@read_tool()
 @log_tool
 async def get_current_alerts(
     cluster_name: Optional[str] = None,
@@ -2682,9 +2832,9 @@ async def get_alert_history(
 
 # Ambari Metrics (AMS) tools
 
-@mcp.tool(title="List Ambari Metrics Metadata")
+@read_tool(title="Get Ambari Metrics Metadata")
 @log_tool
-async def list_ambari_metrics_metadata(
+async def get_ambari_metrics_metadata(
     app_id: Optional[str] = None,
     metric_name_filter: Optional[str] = None,
     host_filter: Optional[str] = None,
@@ -2694,9 +2844,9 @@ async def list_ambari_metrics_metadata(
 ) -> str:
     """Retrieve metric metadata from Ambari Metrics service with optional filters."""
     # Check AMS availability first
-    is_available, error_msg = await check_ams_availability()
-    if not is_available:
-        return f"ERROR: Ambari Metrics Service is unavailable.\n\n{error_msg}\n\nPlease ensure that:\n1. Ambari Metrics Collector service is started\n2. The service is accessible at {AMBARI_METRICS_BASE_URL}\n3. Network connectivity is working properly"
+    ams_error = await ams_unavailable_message()
+    if ams_error:
+        return ams_error
     
     catalog, lookup = await ensure_metric_catalog()
     canonical_app = canonicalize_app_id(app_id, lookup)
@@ -2848,7 +2998,7 @@ async def list_ambari_metrics_metadata(
 
             lines.append("")
             lines.append(
-                'Next: call query_ambari_metrics(metric_names="<exact_name>", app_id="%s", ...)' % fallback_app
+                'Next: call get_ambari_metrics(metric_names="<exact_name>", app_id="%s", ...)' % fallback_app
             )
             lines.append("Hostname is optional; omit it for cluster-wide data or supply explicit hosts to narrow the scope.")
 
@@ -2908,9 +3058,9 @@ async def list_ambari_metrics_metadata(
     return "\n".join(lines)
 
 
-@mcp.tool(title="List Common Metrics Catalog")
+@read_tool(title="Get Common Metrics Catalog")
 @log_tool
-async def list_common_metrics_catalog(
+async def get_common_metrics_catalog(
     app_id: Optional[str] = None,
     search: Optional[str] = None,
     limit: int = 40,
@@ -2921,6 +3071,9 @@ async def list_common_metrics_catalog(
 
     _ = (min_score, include_description)
     limit = max(1, limit)
+    ams_error = await ams_unavailable_message()
+    if ams_error:
+        return ams_error
     catalog, lookup = await ensure_metric_catalog()
 
     def resolve_targets(raw_values: List[str]) -> List[str]:
@@ -2984,7 +3137,7 @@ async def list_common_metrics_catalog(
         lines.append("No metrics matched the given filters.")
     else:
         lines.append("")
-        lines.append('Tip: Use query_ambari_metrics(metric_names="<metric>", app_id="<app>") to fetch data.')
+        lines.append('Tip: Use get_ambari_metrics(metric_names="<metric>", app_id="<app>") to fetch data.')
 
     return "\n".join(lines)
 
@@ -3022,6 +3175,9 @@ async def ambari_metrics_catalog_resource(
         refresh_requested = refresh.strip().lower() in {"1", "true", "yes", "refresh", "force"}
 
     use_cache = not refresh_requested
+    ams_error = await ams_unavailable_message()
+    if ams_error:
+        raise ResourceError(ams_error)
     catalog, lookup = await ensure_metric_catalog(use_cache=use_cache)
 
     selector_normalized = selector_input
@@ -3052,15 +3208,18 @@ async def ambari_metrics_catalog_resource(
     return json.dumps(payload, separators=(",", ":"))
 
 
-@mcp.tool(title="List Ambari Metric Apps")
+@read_tool(title="Get Ambari Metric Apps")
 @log_tool
-async def list_ambari_metric_apps(
+async def get_ambari_metric_apps(
     refresh: bool = False,
     include_counts: bool = True,
     limit: int = 200,
 ) -> str:
     """Return discovered AMS appIds, optionally with metric counts."""
 
+    ams_error = await ams_unavailable_message()
+    if ams_error:
+        return ams_error
     catalog, _ = await ensure_metric_catalog(use_cache=not refresh)
     if not catalog:
         return "No Ambari Metrics appIds discovered."
@@ -3087,14 +3246,14 @@ async def list_ambari_metric_apps(
         lines.append(f"… {len(app_items) - limit} additional appIds not shown (increase limit).")
 
     lines.append("")
-    lines.append("Tip: Use ambari-metrics://catalog/<appId> or list_common_metrics_catalog(app_id=…) to inspect metric names.")
+    lines.append("Tip: Use ambari-metrics://catalog/<appId> or get_common_metrics_catalog(app_id=…) to inspect metric names.")
 
     return "\n".join(lines)
 
 
-@mcp.tool(title="HDFS DFSAdmin Report")
+@read_tool(title="Get HDFS DFSAdmin Report")
 @log_tool
-async def hdfs_dfadmin_report(
+async def get_hdfs_dfsadmin_report(
     cluster_name: Optional[str] = None,
     # AMS 메트릭 조회 시간 범위(분). ?startTime=(N분전)&endTime=(지금) 쿼리에 사용.
     # HTTP 소켓 타임아웃인 AMBARI_METRICS_TIMEOUT(초)과는 전혀 다른 개념.
@@ -3104,7 +3263,7 @@ async def hdfs_dfadmin_report(
     ams_available, ams_error_msg = await check_ams_availability()
     if not ams_available:
         logger.warning(
-            "hdfs_dfadmin_report continuing with Ambari REST API fallback; "
+            "get_hdfs_dfsadmin_report continuing with Ambari REST API fallback; "
             "AMS unavailable: %s",
             ams_error_msg,
         )
@@ -3455,9 +3614,9 @@ async def hdfs_dfadmin_report(
     return "\n".join(lines)
 
 
-@mcp.tool(title="Query Ambari Metrics")
+@read_tool(title="Get Ambari Metrics")
 @log_tool
-async def query_ambari_metrics(
+async def get_ambari_metrics(
     metric_names: str,
     app_id: Optional[str] = None,
     hostnames: Optional[str] = None,
@@ -3473,9 +3632,9 @@ async def query_ambari_metrics(
 ) -> str:
     """Fetch time-series metrics (exact metric names only) from Ambari Metrics."""
     # Check AMS availability first
-    is_available, error_msg = await check_ams_availability()
-    if not is_available:
-        return f"ERROR: Ambari Metrics Service is unavailable.\\n\\n{error_msg}\\n\\nThis tool requires AMS to query time-series metrics.\\nPlease ensure that:\\n1. Ambari Metrics Collector service is started\\n2. The service is accessible at {AMBARI_METRICS_BASE_URL}\\n3. The target services are running and reporting metrics"
+    ams_error = await ams_unavailable_message()
+    if ams_error:
+        return ams_error
 
     start_ms, end_ms, window_desc = resolve_metrics_time_range(duration, start_time, end_time)
     if start_ms is None or end_ms is None:
@@ -3859,6 +4018,21 @@ def main(argv: Optional[List[str]] = None):
         dest="secret_key",
         help="Secret key for Bearer token authentication. Required when auth is enabled.",
     )
+    access_group = parser.add_mutually_exclusive_group()
+    access_group.add_argument(
+        "--read-only",
+        dest="read_only",
+        action="store_true",
+        default=None,
+        help="Expose only read tools (get_*); hide state-changing set_* tools. Overrides MCP_READ_ONLY env.",
+    )
+    access_group.add_argument(
+        "--read-write",
+        dest="read_only",
+        action="store_false",
+        default=None,
+        help="Expose both read (get_*) and write (set_*) tools. Overrides MCP_READ_ONLY env.",
+    )
     # Allow future extension without breaking unknown args usage
     args = parser.parse_args(argv)
 
@@ -3912,6 +4086,17 @@ def main(argv: Optional[List[str]] = None):
         mcp.auth = _build_static_token_auth(secret_key)
     else:
         mcp.auth = None
+
+    # Read-only mode: hide write tools (set_*) so clients cannot list or call them.
+    if args.read_only is None:
+        read_only = _parse_bool_env(os.getenv("MCP_READ_ONLY", "false"))
+    else:
+        read_only = args.read_only
+    if read_only:
+        mcp.disable(tags={WRITE_TOOL_TAG})
+        logger.info("Read-only mode enabled: write tools (set_*) are disabled")
+    else:
+        mcp.enable(tags={WRITE_TOOL_TAG})
 
     # Transport 모드에 따른 실행
     if transport_type == "streamable-http":
