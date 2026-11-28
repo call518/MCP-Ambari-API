@@ -128,14 +128,36 @@ async def test_read_only_flag_hides_and_blocks_write_tools(run_main):
 @pytest.mark.anyio
 async def test_read_only_env_and_cli_precedence(run_main, monkeypatch):
     monkeypatch.setenv("MCP_READ_ONLY", "true")
-    run_main([])
-    assert not {t.name for t in await _list_tools()} & WRITE_TOOLS
-
     run_main(["--read-write"])
     assert WRITE_TOOLS <= {t.name for t in await _list_tools()}
 
+    monkeypatch.setenv("MCP_READ_ONLY", "false")
+    run_main(["--read-only"])
+    assert not {t.name for t in await _list_tools()} & WRITE_TOOLS
+
 
 @pytest.mark.anyio
-async def test_write_tools_exposed_by_default(run_main):
+async def test_write_tools_hidden_by_default(run_main):
     run_main([])
-    assert WRITE_TOOLS <= {t.name for t in await _list_tools()}
+    assert not {t.name for t in await _list_tools()} & WRITE_TOOLS
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    ("value", "write_enabled"),
+    [
+        ("false", True),
+        ("0", True),
+        ("No", True),
+        (" OFF ", True),
+        ("true", False),
+        ("1", False),
+        ("", False),
+        ("maybe", False),
+    ],
+)
+async def test_read_only_env_values(run_main, monkeypatch, value, write_enabled):
+    monkeypatch.setenv("MCP_READ_ONLY", value)
+    run_main([])
+    exposed = WRITE_TOOLS <= {t.name for t in await _list_tools()}
+    assert exposed is write_enabled

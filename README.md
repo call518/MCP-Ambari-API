@@ -211,8 +211,9 @@ copied static tool list.
 
 Write tools take `action` = `start`, `stop`, or `restart`:
 `set_service_state`, `set_all_services_state`, and `set_host_component_state`.
-In read-only mode (`MCP_READ_ONLY=true` or `--read-only`), write tools are
-not listed and calls to them are rejected.
+Read-only mode is on by default: write tools are not listed and calls to them
+are rejected. To enable write tools, set `MCP_READ_ONLY=false` or pass
+`--read-write`; in Claude Desktop (MCPB), turn off **Read-only mode**.
 
 ## Configuration
 
@@ -229,7 +230,7 @@ precedence over defaults.
 | `MCP_LOG_LEVEL` | `INFO` | Log level |
 | `REMOTE_AUTH_ENABLE` | `false` | Enable HTTP bearer authentication |
 | `REMOTE_SECRET_KEY` | empty | Required when authentication is enabled |
-| `MCP_READ_ONLY` | `false` | Expose only read tools (`get_*`); hide write tools (`set_*`) |
+| `MCP_READ_ONLY` | `true` | Expose only read tools (`get_*`); hide write tools (`set_*`). Only `false`/`0`/`no`/`off` enables write tools; empty or unrecognized values keep read-only mode |
 
 CLI equivalents are `--type`, `--host`, `--port`, `--auth-enable` /
 `--auth-disable`, `--secret-key`, and `--read-only` / `--read-write`.
@@ -278,8 +279,9 @@ get_ambari_metrics(
 - Plain HTTP does not protect credentials in transit. Use a TLS reverse proxy
   for remote access.
 - Keep unauthenticated development services bound to localhost.
-- Review `set_*` tool calls (start, stop, restart) before approving them in the
-  MCP client. Set `MCP_READ_ONLY=true` for monitoring-only deployments.
+- Write tools are disabled by default. Enable them (`MCP_READ_ONLY=false`) only
+  where service operations are needed, and review `set_*` tool calls (start,
+  stop, restart) before approving them in the MCP client.
 
 ## Compatibility
 

@@ -40,8 +40,8 @@ chooses tools itself, so the actual tool calls can differ.
 ### ⚙️ Service Operations
 
 State-changing tools are named `set_*` and take `action` = `start`, `stop`, or
-`restart`. They are not available when the server runs in read-only mode
-(`MCP_READ_ONLY=true` or `--read-only`).
+`restart`. The server runs in read-only mode by default, so these tools are
+available only after setting `MCP_READ_ONLY=false` or passing `--read-write`.
 
 **set_service_state**
 - "Start the HDFS service." → `set_service_state("HDFS", action="start")`

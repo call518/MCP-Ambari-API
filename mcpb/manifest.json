@@ -110,8 +110,8 @@
     "mcp_read_only": {
       "type": "boolean",
       "title": "Read-only mode (MCP_READ_ONLY)",
-      "description": "Expose only read tools (get_*) and hide tools that start, stop, or restart services (set_*).",
-      "default": false,
+      "description": "Expose only read tools (get_*) and hide tools that start, stop, or restart services (set_*). Enabled by default; turn off to allow service operations.",
+      "default": true,
       "required": false
     }
   }

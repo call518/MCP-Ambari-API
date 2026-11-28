@@ -65,6 +65,21 @@ def _parse_bool_env(value: str) -> bool:
     return value.strip().lower() in TRUTHY_VALUES
 
 
+FALSY_VALUES = ("false", "0", "no", "off")
+
+
+def _parse_read_only_env(value: str) -> bool:
+    """Parse MCP_READ_ONLY; empty or unrecognized values keep read-only mode on."""
+    normalized = value.strip().lower()
+    if normalized in FALSY_VALUES:
+        return False
+    if normalized and normalized not in TRUTHY_VALUES:
+        logger.warning(
+            "Unrecognized MCP_READ_ONLY=%r; keeping read-only mode enabled", value
+        )
+    return True
+
+
 def _build_static_token_auth(secret_key: str) -> StaticTokenVerifier:
     tokens = {
         secret_key: {
@@ -4024,14 +4039,14 @@ def main(argv: Optional[List[str]] = None):
         dest="read_only",
         action="store_true",
         default=None,
-        help="Expose only read tools (get_*); hide state-changing set_* tools. Overrides MCP_READ_ONLY env.",
+        help="Expose only read tools (get_*); hide state-changing set_* tools (default). Overrides MCP_READ_ONLY env.",
     )
     access_group.add_argument(
         "--read-write",
         dest="read_only",
         action="store_false",
         default=None,
-        help="Expose both read (get_*) and write (set_*) tools. Overrides MCP_READ_ONLY env.",
+        help="Expose both read (get_*) and write (set_*) tools. Overrides MCP_READ_ONLY env (default: true).",
     )
     # Allow future extension without breaking unknown args usage
     args = parser.parse_args(argv)
@@ -4088,8 +4103,9 @@ def main(argv: Optional[List[str]] = None):
         mcp.auth = None
 
     # Read-only mode: hide write tools (set_*) so clients cannot list or call them.
+    # Safe default: only an explicit falsy value enables write tools.
     if args.read_only is None:
-        read_only = _parse_bool_env(os.getenv("MCP_READ_ONLY", "false"))
+        read_only = _parse_read_only_env(os.getenv("MCP_READ_ONLY", ""))
     else:
         read_only = args.read_only
     if read_only:
