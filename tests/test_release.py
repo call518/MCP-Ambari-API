@@ -60,6 +60,18 @@ class ReleaseTests(unittest.TestCase):
         self.assertEqual(command.call_args.args[-2], "previous..current")
 
     @patch("scripts.publish_release.command")
+    def test_notes_list_commits_newest_first(self, command):
+        command.side_effect = [
+            "current",
+            "newest000\0Newest change\0\nolder0000\0Older change\0\n",
+        ]
+        notes = release_notes("owner/repo", "1.0.1", None)
+        log_args = command.call_args.args
+        self.assertIn("--topo-order", log_args)
+        self.assertNotIn("--reverse", log_args)
+        self.assertLess(notes.index("Newest change"), notes.index("Older change"))
+
+    @patch("scripts.publish_release.command")
     def test_initial_release_notes(self, command):
         command.side_effect = ["current", "abcdef123\0Initial commit\0"]
         self.assertIn("Initial release.", release_notes("owner/repo", "1.0.0", None))
